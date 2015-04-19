@@ -78,8 +78,8 @@ int main(int argc, char** argv)
 		signal(SIGTERM, SIG_IGN);
 
 	console.setPrompt(">");
-	AddTestingCommands(console, updater);
-	AddLogCallback(console);
+	CommandHandler::AddAllCommands(console, updater);
+	CommandHandler::AddAllLogCallback(console);
 	console.addCommand(Console::Command("exit", command_exit));
 	console.print(std::string("Client Terminal Test"));
 
@@ -183,9 +183,7 @@ int main(int argc, char** argv)
 	if (thread.joinable())
 		thread.join();
 
-	DelLogCallback();
-
-	delete ElabClient::getInst();
+	CommandHandler::DelAllLogCallback();
 
 	return 0;
 }

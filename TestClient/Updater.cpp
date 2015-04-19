@@ -1,7 +1,5 @@
 #include "Updater.h"
 
-#include "imgui.h"
-
 Updater::~Updater()
 {
 	for(auto it = listeners.begin(); it != listeners.end(); it++) {
@@ -56,9 +54,6 @@ void Updater::GUIMenuListeners()
 {
 	bool last = true;
 	for (auto it = listeners.begin(); it != listeners.end(); ++it) {
-		if (last)
-			ImGui::Separator();
-
 		last = (*it)->OnGUIMenu();
 	}
 }

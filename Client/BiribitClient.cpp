@@ -1,5 +1,4 @@
 #include "BiribitClient.h"
-#include "ServerInfo.h"
 #include "TaskPool.h"
 #include "PrintLog.h"
 #include "Packet.h"

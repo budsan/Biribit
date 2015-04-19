@@ -18,10 +18,24 @@ add_executable(TestClient.exe
 	Updater.cpp
 )
 
+add_executable(TerminalClient.exe
+        ${SYSTEM_LIB_CPPS}
+	Commands.cpp
+	Console.cpp
+	Updater.cpp
+	CursesClient.cpp
+)
+
 target_link_libraries(TestClient.exe
 	rt
         pthread
         GL
         SDL2
 	BiribitClient
+)
+
+target_link_libraries(TerminalClient.exe
+        rt
+        pthread
+        BiribitClient
 )

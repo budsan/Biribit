@@ -15,4 +15,5 @@ target_link_libraries(BiribitClient
 	RakNetLibStatic
         rt
         pthread
+	ncurses
 )

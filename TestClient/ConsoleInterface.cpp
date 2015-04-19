@@ -43,13 +43,12 @@ void ConsoleInterface::OnGUI()
 	ImGui::BeginChild("ScrollingRegion", ImVec2(0, -ImGui::GetTextLineHeightWithSpacing() * 2));
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
 	const std::list<std::string>& output = out();
-	std::list<std::string>::const_iterator it = output.begin();
-	for (unsigned int i = 0; it != output.end(); ++i, ++it)
+	std::list<std::string>::const_reverse_iterator it = output.rbegin();
+	for (unsigned int i = 0; it != output.rend(); ++i, ++it)
 	{
 		const char* item = it->c_str();
-		ImVec4 col(1, 1, 1, 1); // A better implement may store a type per-item. For the sample let's just parse the text.
-		if (strstr(item, "[error]")) col = ImVec4(1.0f, 0.4f, 0.4f, 1.0f);
-		else if (strncmp(item, "# ", 2) == 0) col = ImVec4(1.0f, 0.8f, 0.6f, 1.0f);
+		ImVec4 col(1, 1, 1, 1);
+		if (strncmp(item, ">", 1) == 0) col = ImVec4(1.0f, 0.8f, 0.6f, 1.0f);
 		ImGui::PushStyleColor(ImGuiCol_Text, col);
 		ImGui::TextUnformatted(item);
 		ImGui::PopStyleColor();

@@ -29,7 +29,7 @@ Console::Command& Console::Command::operator=(const Console::Command &other)
 
 Console::Console()
 {
-	history.push_front(std::string());
+	history.push_back(std::string());
 	historyNav = history.begin();
 	cursorPos = 0;
 }
@@ -77,7 +77,7 @@ void Console::print(const std::string &msg)
 	if (!out.str().empty()) {
 		std::string line;
 		while(std::getline(out, line)) {
-			if (!line.empty()) output.push_back(line);
+			if (!line.empty()) output.push_front(line);
 		}
 	}
 }
