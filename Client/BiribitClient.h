@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "Config.h"
-#include <Types.h>
 
 struct API_EXPORT ServerInfo
 {
@@ -24,6 +23,7 @@ class API_EXPORT BiribitClient
 public:
 
 	BiribitClient();
+	virtual ~BiribitClient();
 
 	void Connect(const char* addr = nullptr, unsigned short port = 0, const char* password = nullptr);
 	void Disconnect();
@@ -34,5 +34,5 @@ public:
 	const std::vector<ServerInfo>& GetDiscoverInfo();
 
 private:
-	unique<BiribitClientImpl> m_impl;
+	BiribitClientImpl* m_impl;
 };

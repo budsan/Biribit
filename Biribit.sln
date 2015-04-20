@@ -20,6 +20,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProtoMessages", "ProtoMessages\ProtoMessages.vcxproj", "{52E4F9ED-1694-4D02-A770-F033ED81486D}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestClient", "TestClient\TestClient.vcxproj", "{50D3250D-7C38-4B2C-89B1-6CB5B4E35E93}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1B0E7429-A050-4E08-8579-9B88ABE2D020} = {1B0E7429-A050-4E08-8579-9B88ABE2D020}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

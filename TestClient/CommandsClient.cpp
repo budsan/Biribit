@@ -50,7 +50,7 @@ public:
 
 	shared<BiribitClient> GetClient()
 	{
-		if (client != nullptr)
+		if (client == nullptr)
 			client = shared<BiribitClient>(new BiribitClient());
 
 		return client;

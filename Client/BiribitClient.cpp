@@ -19,6 +19,7 @@
 
 #include "RefSwap.h"
 #include "TaskPool.h"
+#include <Types.h>
 
 ServerInfo::ServerInfo() :
 	addr(RakNet::UNASSIGNED_SYSTEM_ADDRESS.ToString(false)),
@@ -310,6 +311,11 @@ void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 BiribitClient::BiribitClient() : m_impl(new BiribitClientImpl())
 {
 
+}
+
+BiribitClient::~BiribitClient()
+{
+	delete m_impl;
 }
 
 void BiribitClient::Disconnect()
