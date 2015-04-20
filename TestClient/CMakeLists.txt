@@ -8,6 +8,7 @@ link_directories(
 add_executable(TestClient.exe
         ${SYSTEM_LIB_CPPS}
 	Commands.cpp
+        CommandsClient.cpp
 	Console.cpp
 	ConsoleInterface.cpp
 	Game.cpp

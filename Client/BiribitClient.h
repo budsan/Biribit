@@ -1,45 +1,29 @@
 ﻿#pragma once
 
-#include "Config.h"
-
-#include <map>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
+#include <string>
+#include <cstdint>
 #include <vector>
-#include <functional>
 
-#include "MessageIdentifiers.h"
-#include "RakPeerInterface.h"
-#include "RakNetStatistics.h"
-#include "RakNetTypes.h"
-#include "BitStream.h"
-#include "PacketLogger.h"
-#include "RakNetTypes.h"
-#include "StringCompressor.h"
-#include "GetTime.h"
+#include "Config.h"
+#include <Types.h>
 
-#include "RefSwap.h"
-#include "TaskPool.h"
-#include "Types.h"
-
-class API_EXPORT ServerInfo
+struct API_EXPORT ServerInfo
 {
-public:
 		std::string name;
+		std::string addr;
 		std::uint32_t ping;
-		RakNet::SystemAddress addr;
+		unsigned short port;
 		bool valid;
 
 		ServerInfo();
 };
 
+class BiribitClientImpl;
 class API_EXPORT BiribitClient
 {
 public:
 
 	BiribitClient();
-	~BiribitClient();
 
 	void Connect(const char* addr = nullptr, unsigned short port = 0, const char* password = nullptr);
 	void Disconnect();
@@ -50,14 +34,5 @@ public:
 	const std::vector<ServerInfo>& GetDiscoverInfo();
 
 private:
-	RakNet::RakPeerInterface *m_peer;
-	unique<TaskPool> m_pool;
-
-	static void RaknetThreadUpdate(RakNet::RakPeerInterface *peer, void* data);
-	void RakNetUpdated();
-	void HandlePacket(RakNet::Packet*);
-
-	std::map<RakNet::SystemAddress, ServerInfo> serverList;
-	RefSwap<std::vector<ServerInfo>> serverListReq;
-	bool serverListReqReady;
+	unique<BiribitClientImpl> m_impl;
 };

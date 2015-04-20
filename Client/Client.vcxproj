@@ -69,28 +69,24 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
     <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
     <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
     <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
     <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
   </PropertyGroup>
@@ -159,14 +155,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Common\Packet.cpp" />
     <ClCompile Include="..\Common\PrintLog.cpp" />
-    <ClCompile Include="NetworkManager.cpp" />
-    <ClCompile Include="RakNetClient.cpp" />
+    <ClCompile Include="BiribitClient.cpp" />
+    <ClCompile Include="BiribitClientExports.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Common\Packet.h" />
     <ClInclude Include="..\Common\PrintLog.h" />
-    <ClInclude Include="NetworkManager.h" />
-    <ClInclude Include="RakNetClient.h" />
+    <ClInclude Include="BiribitClient.h" />
+    <ClInclude Include="BiribitClientExports.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

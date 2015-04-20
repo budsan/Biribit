@@ -66,22 +66,18 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>

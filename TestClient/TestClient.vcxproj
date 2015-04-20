@@ -67,27 +67,31 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LibraryPath>$(SolutionDir)lib\$(Platform)\;$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
-    <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)</OutDir>
+    <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
+    <IncludePath>$(SolutionDir)TestClient\include;$(SolutionDir)Client\;$(IncludePath)</IncludePath>
+    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LibraryPath>$(SolutionDir)lib\$(Platform)\;$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
-    <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)</OutDir>
+    <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
+    <IncludePath>$(SolutionDir)TestClient\include;$(SolutionDir)Client\;$(IncludePath)</IncludePath>
+    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LibraryPath>$(SolutionDir)lib\$(Platform)\;$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
-    <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)</OutDir>
+    <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
+    <IncludePath>$(SolutionDir)TestClient\include;$(SolutionDir)Client\;$(IncludePath)</IncludePath>
+    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LibraryPath>$(SolutionDir)lib\$(Platform)\;$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
-    <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)</OutDir>
+    <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
+    <IncludePath>$(SolutionDir)TestClient\include;$(SolutionDir)Client\;$(IncludePath)</IncludePath>
+    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

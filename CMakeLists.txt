@@ -23,6 +23,7 @@ include_directories(
 	${PROJECT_SOURCE_DIR}/include
 	${PROJECT_SOURCE_DIR}/Common
 	${PROJECT_SOURCE_DIR}/RakNet
+        ${PROJECT_SOURCE_DIR}/Client
 )
 
 add_subdirectory(RakNet)

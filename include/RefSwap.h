@@ -9,11 +9,6 @@ template<class T> class RefSwap
 
 public:
 
-	RefSwap() : sel(0) {
-		ptr[0] = new T();
-		ptr[1] = new T();
-	}
-
 	template<class... Args> RefSwap(Args&&... args) : sel(0) {
 		ptr[0] = new T(std::forward<Args>(args)...);
 		ptr[1] = new T(std::forward<Args>(args)...);

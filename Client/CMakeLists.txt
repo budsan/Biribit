@@ -9,6 +9,7 @@ add_library(BiribitClient SHARED
         ../Common/Packet.cpp
         ../Common/PrintLog.cpp
         BiribitClient.cpp
+        BiribitClientExports.cpp
 )
 
 target_link_libraries(BiribitClient

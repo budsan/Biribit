@@ -3,8 +3,25 @@
 #include "PrintLog.h"
 #include "Packet.h"
 
+#include <map>
+#include <vector>
+#include <functional>
+
+#include "MessageIdentifiers.h"
+#include "RakPeerInterface.h"
+#include "RakNetStatistics.h"
+#include "RakNetTypes.h"
+#include "BitStream.h"
+#include "PacketLogger.h"
+#include "RakNetTypes.h"
+#include "StringCompressor.h"
+#include "GetTime.h"
+
+#include "RefSwap.h"
+#include "TaskPool.h"
+
 ServerInfo::ServerInfo() :
-	addr(RakNet::UNASSIGNED_SYSTEM_ADDRESS),
+	addr(RakNet::UNASSIGNED_SYSTEM_ADDRESS.ToString(false)),
 	ping(0), name(), valid (false)
 {
 
@@ -36,7 +53,34 @@ const char* ConnectionAttemptResultStr[] = {
 
 const unsigned short SERVER_DEFAULT_PORT = 8287;
 
-BiribitClient::BiribitClient() : m_peer(nullptr), serverListReqReady(true)
+class BiribitClientImpl
+{
+public:
+	BiribitClientImpl();
+	~BiribitClientImpl();
+
+	void Connect(const char* addr = nullptr, unsigned short port = 0, const char* password = nullptr);
+	void Disconnect();
+
+	void DiscoverOnLan(unsigned short port);
+	void ClearDiscoverInfo();
+	void RefreshDiscoverInfo();
+	const std::vector<ServerInfo>& GetDiscoverInfo();
+
+private: 
+	RakNet::RakPeerInterface *m_peer;
+	unique<TaskPool> m_pool;
+
+	static void RaknetThreadUpdate(RakNet::RakPeerInterface *peer, void* data);
+	void RakNetUpdated();
+	void HandlePacket(RakNet::Packet*);
+
+	std::map<RakNet::SystemAddress, ServerInfo> serverList;
+	RefSwap<std::vector<ServerInfo>> serverListReq;
+	bool serverListReqReady;
+};
+
+BiribitClientImpl::BiribitClientImpl() : m_peer(nullptr), serverListReqReady(true)
 {
 	m_pool = unique<TaskPool>(new TaskPool(1, "BiribitClient"));
 
@@ -57,7 +101,7 @@ BiribitClient::BiribitClient() : m_peer(nullptr), serverListReqReady(true)
 	}
 }
 
-BiribitClient::~BiribitClient()
+BiribitClientImpl::~BiribitClientImpl()
 {
 	if (m_peer != nullptr)
 	{
@@ -74,14 +118,14 @@ BiribitClient::~BiribitClient()
 	}
 }
 
-void BiribitClient::RaknetThreadUpdate(RakNet::RakPeerInterface *peer, void* data)
+void BiribitClientImpl::RaknetThreadUpdate(RakNet::RakPeerInterface *peer, void* data)
 {
-	if (data != nullptr && static_cast<BiribitClient*>(data)->m_peer == peer) {
-		static_cast<BiribitClient*>(data)->RakNetUpdated();
+	if (data != nullptr && static_cast<BiribitClientImpl*>(data)->m_peer == peer) {
+		static_cast<BiribitClientImpl*>(data)->RakNetUpdated();
 	}
 }
 
-void BiribitClient::RakNetUpdated()
+void BiribitClientImpl::RakNetUpdated()
 {
 	m_pool->enqueue([this]() {
 		RakNet::Packet* p = nullptr;
@@ -90,7 +134,7 @@ void BiribitClient::RakNetUpdated()
 	});
 }
 
-void BiribitClient::Connect(const char* addr, unsigned short port, const char* password)
+void BiribitClientImpl::Connect(const char* addr, unsigned short port, const char* password)
 {
 	if (port == 0)
 		port = SERVER_DEFAULT_PORT;
@@ -107,7 +151,7 @@ void BiribitClient::Connect(const char* addr, unsigned short port, const char* p
 	});
 }
 
-void BiribitClient::Disconnect()
+void BiribitClientImpl::Disconnect()
 {
 	m_pool->enqueue([this]()
 	{
@@ -117,30 +161,39 @@ void BiribitClient::Disconnect()
 	});
 }
 
-void BiribitClient::DiscoverOnLan(unsigned short port)
+void BiribitClientImpl::DiscoverOnLan(unsigned short port)
 {
 	if (port == 0)
 		port = SERVER_DEFAULT_PORT;
 
 	m_pool->enqueue([this, port]() {
+		printLog("Discovering on Lan in port %d...", port);
 		m_peer->Ping("255.255.255.255", port, false);
 	});
 }
 
-void BiribitClient::RefreshDiscoverInfo()
+void BiribitClientImpl::RefreshDiscoverInfo()
 {
 	m_pool->enqueue([this]()
 	{
 		for (auto it = serverList.begin(); it != serverList.end(); it++)
 		{
 			ServerInfo& info = it->second;
-			m_peer->Ping(info.addr.ToString(false), info.addr.GetPort(), false);
+			m_peer->Ping(it->first.ToString(false), it->first.GetPort(), false);
 			it->second.valid = false;
 		}
 	});
 }
 
-const std::vector<ServerInfo>& BiribitClient::GetDiscoverInfo()
+void BiribitClientImpl::ClearDiscoverInfo()
+{
+	m_pool->enqueue([this]()
+	{
+		serverList.clear();
+	});
+}
+
+const std::vector<ServerInfo>& BiribitClientImpl::GetDiscoverInfo()
 {
 	if (serverListReqReady)
 	{
@@ -155,7 +208,8 @@ const std::vector<ServerInfo>& BiribitClient::GetDiscoverInfo()
 				if (it->second.valid)
 				{
 					back.push_back(it->second);
-					back.back().addr = it->first;
+					back.back().addr = it->first.ToString(false);
+					back.back().port = it->first.GetPort();
 				}
 			}
 
@@ -167,8 +221,7 @@ const std::vector<ServerInfo>& BiribitClient::GetDiscoverInfo()
 	return serverListReq.front();
 }
 
-
-void BiribitClient::HandlePacket(RakNet::Packet* pPacket)
+void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 {
 	Packet packet;
 	packet.append(static_cast<const void*>(pPacket->data), pPacket->length);
@@ -250,4 +303,36 @@ void BiribitClient::HandlePacket(RakNet::Packet* pPacket)
 		printLog("UNKNOWN PACKET IDENTIFIER");
 		break;
 	}
+}
+
+//---------------------------------------------------------------------------//
+
+BiribitClient::BiribitClient() : m_impl(new BiribitClientImpl())
+{
+
+}
+
+void BiribitClient::Disconnect()
+{
+	m_impl->Disconnect();
+}
+
+void BiribitClient::DiscoverOnLan(unsigned short port)
+{
+	m_impl->DiscoverOnLan(port);
+}
+
+void BiribitClient::ClearDiscoverInfo()
+{
+	m_impl->ClearDiscoverInfo();
+}
+
+void BiribitClient::RefreshDiscoverInfo()
+{
+	m_impl->RefreshDiscoverInfo();
+}
+
+const std::vector<ServerInfo>& BiribitClient::GetDiscoverInfo()
+{
+	return m_impl->GetDiscoverInfo();
 }

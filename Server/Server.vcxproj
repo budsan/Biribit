@@ -70,28 +70,24 @@
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <ExecutablePath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(ExecutablePath)</ExecutablePath>
     <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
