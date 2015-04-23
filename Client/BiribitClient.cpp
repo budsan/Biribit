@@ -17,11 +17,14 @@
 #include "StringCompressor.h"
 #include "GetTime.h"
 
+#include <BiribitMessageIdentifiers.h>
+
 #include "RefSwap.h"
 #include "TaskPool.h"
 #include <Types.h>
+#include <Generic.h>
 
-ServerInfo::ServerInfo() :
+ServerDescription::ServerDescription() :
 	addr(RakNet::UNASSIGNED_SYSTEM_ADDRESS.ToString(false)),
 	ping(0), name(), valid (false)
 {
@@ -66,7 +69,7 @@ public:
 	void DiscoverOnLan(unsigned short port);
 	void ClearDiscoverInfo();
 	void RefreshDiscoverInfo();
-	const std::vector<ServerInfo>& GetDiscoverInfo();
+	const std::vector<ServerDescription>& GetDiscoverInfo();
 
 private: 
 	RakNet::RakPeerInterface *m_peer;
@@ -76,8 +79,10 @@ private:
 	void RakNetUpdated();
 	void HandlePacket(RakNet::Packet*);
 
-	std::map<RakNet::SystemAddress, ServerInfo> serverList;
-	RefSwap<std::vector<ServerInfo>> serverListReq;
+	Generic::TempBuffer m_buffer;
+
+	std::map<RakNet::SystemAddress, ServerDescription> serverList;
+	RefSwap<std::vector<ServerDescription>> serverListReq;
 	bool serverListReqReady;
 };
 
@@ -179,7 +184,7 @@ void BiribitClientImpl::RefreshDiscoverInfo()
 	{
 		for (auto it = serverList.begin(); it != serverList.end(); it++)
 		{
-			ServerInfo& info = it->second;
+			ServerDescription& info = it->second;
 			m_peer->Ping(it->first.ToString(false), it->first.GetPort(), false);
 			it->second.valid = false;
 		}
@@ -194,14 +199,14 @@ void BiribitClientImpl::ClearDiscoverInfo()
 	});
 }
 
-const std::vector<ServerInfo>& BiribitClientImpl::GetDiscoverInfo()
+const std::vector<ServerDescription>& BiribitClientImpl::GetDiscoverInfo()
 {
 	if (serverListReqReady)
 	{
 		serverListReqReady = false;
 		m_pool->enqueue([this]()
 		{
-			std::vector<ServerInfo>& back = serverListReq.back();
+			std::vector<ServerDescription>& back = serverListReq.back();
 			back.clear();
 
 			for (auto it = serverList.begin(); it != serverList.end(); it++)
@@ -252,7 +257,20 @@ void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		printLog("ID_INCOMPATIBLE_PROTOCOL_VERSION");
 		break;
 	case ID_ADVERTISE_SYSTEM:
-		printLog("ID_ADVERTISE_SYSTEM");
+		packet >> packetIdentifier;
+		if (ID_SERVER_INFO_RESPONSE)
+		{
+			std::size_t size = packet.getDataSize() - packet.getReadPos();
+			m_buffer.Ensure(size);
+			packet.read(m_buffer.data, size);
+			ServerInfo info;
+			if (info.ParseFromArray(m_buffer.data, size))
+			{
+				ServerDescription& descr = serverList[pPacket->systemAddress];
+				descr.name = info.name();
+				descr.valid = true;
+			}
+		}
 		break;
 	case ID_UNCONNECTED_PONG:
 	{
@@ -265,8 +283,16 @@ void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			pingTime = temp;
 		}
 
-		ServerInfo& info = serverList[pPacket->systemAddress];
-		info.ping = current-pingTime;
+		ServerDescription& descr = serverList[pPacket->systemAddress];
+		descr.ping = current - pingTime;
+		
+		Packet tosend;
+		tosend << (RakNet::MessageID) ID_SERVER_INFO_REQUEST;
+		m_peer->AdvertiseSystem(
+			pPacket->systemAddress.ToString(false),
+			pPacket->systemAddress.GetPort(),
+			(const char*) tosend.getData(),
+			tosend.getDataSize());
 
 		break;
 	}
@@ -338,7 +364,7 @@ void BiribitClient::RefreshDiscoverInfo()
 	m_impl->RefreshDiscoverInfo();
 }
 
-const std::vector<ServerInfo>& BiribitClient::GetDiscoverInfo()
+const std::vector<ServerDescription>& BiribitClient::GetDiscoverInfo()
 {
 	return m_impl->GetDiscoverInfo();
 }

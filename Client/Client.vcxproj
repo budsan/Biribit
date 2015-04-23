@@ -70,25 +70,25 @@
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(SolutionDir)ProtoMessages;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(SolutionDir)ProtoMessages;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(SolutionDir)ProtoMessages;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)\build\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)\temp\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
     <LibraryPath>$(SolutionDir)lib\$(Platform)\$(Configuration);$(SolutionDir)\build\$(Configuration)_$(Platform);$(LibraryPath)</LibraryPath>
-    <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)include;$(SolutionDir)RakNet;$(SolutionDir)Common;$(SolutionDir)ProtoMessages;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -155,12 +155,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Common\Generic.cpp" />
     <ClCompile Include="..\Common\Packet.cpp" />
     <ClCompile Include="..\Common\PrintLog.cpp" />
     <ClCompile Include="BiribitClient.cpp" />
     <ClCompile Include="BiribitClientExports.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Common\BiribitMessageIdentifiers.h" />
+    <ClInclude Include="..\Common\Generic.h" />
     <ClInclude Include="..\Common\Packet.h" />
     <ClInclude Include="..\Common\PrintLog.h" />
     <ClInclude Include="BiribitClient.h" />

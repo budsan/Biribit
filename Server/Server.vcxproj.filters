@@ -27,7 +27,7 @@
     <ClCompile Include="..\Common\PrintLog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ServerBiribit.cpp">
+    <ClCompile Include="..\Common\Generic.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -44,10 +44,10 @@
     <ClInclude Include="..\Common\PrintLog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ServerListener.h">
+    <ClInclude Include="..\Common\BiribitMessageIdentifiers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ServerBiribit.h">
+    <ClInclude Include="..\Common\Generic.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

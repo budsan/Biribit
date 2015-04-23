@@ -6,7 +6,7 @@
 
 #include "Config.h"
 
-struct API_EXPORT ServerInfo
+struct API_EXPORT ServerDescription
 {
 		std::string name;
 		std::string addr;
@@ -14,7 +14,7 @@ struct API_EXPORT ServerInfo
 		unsigned short port;
 		bool valid;
 
-		ServerInfo();
+		ServerDescription();
 };
 
 class BiribitClientImpl;
@@ -31,7 +31,7 @@ public:
 	void DiscoverOnLan(unsigned short port = 0);
 	void ClearDiscoverInfo();
 	void RefreshDiscoverInfo();
-	const std::vector<ServerInfo>& GetDiscoverInfo();
+	const std::vector<ServerDescription>& GetDiscoverInfo();
 
 private:
 	BiribitClientImpl* m_impl;

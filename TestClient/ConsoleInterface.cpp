@@ -132,6 +132,12 @@ int ConsoleInterface::TextEditCallback(ImGuiTextEditCallbackData* data)
 		break;
 	}
 
+	if (data->BufDirty) {
+		strcpy_s(data->Buf, data->BufSize, editing().c_str());
+		data->CursorPos = cursorPos;
+	}
+
+
 	return 0;
 }
 

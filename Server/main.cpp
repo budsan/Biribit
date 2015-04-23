@@ -1,5 +1,4 @@
 #include "RakNetServer.h"
-#include "ServerBiribit.h"
 #include "Config.h"
 #include "Types.h"
 
@@ -11,7 +10,6 @@
 #include <tclap/CmdLine.h>
 
 RakNetServer server;
-shared<ServerBiribit> biribit = shared<ServerBiribit>(new ServerBiribit());
 
 #ifdef SYSTEM_WINDOWS
 
@@ -71,7 +69,7 @@ int main(int argc, char** argv)
 		std::stringstream ssPort(port);
 		ssPort >> iPort;
 
-		if (server.Run(biribit, iPort, name.length() == 0 ? nullptr : name.c_str()))
+		if (server.Run(iPort, name.length() == 0 ? nullptr : name.c_str()))
 		{
 			char c;
 			while (server.isRunning() && std::cin >> c)

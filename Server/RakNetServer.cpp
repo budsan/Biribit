@@ -12,6 +12,9 @@
 #include "RakSleep.h"
 #include "PacketLogger.h"
 
+#include <Generic.h>
+#include <BiribitMessageIdentifiers.h>
+
 const char* randomNames[] = {
 	"Arianne", "Kesha", "Minerva",
 	"Dianna", "Daisey", "Edna",
@@ -75,10 +78,10 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 	switch (packetIdentifier)
 	{
 	case ID_DISCONNECTION_NOTIFICATION:
-		m_listener->OnDisconnectionNotification(*this, p->guid.g);
+		printLog("ID_DISCONNECTION_NOTIFICATION %s", p->systemAddress.ToString());
 		break;
 	case ID_NEW_INCOMING_CONNECTION:
-		m_listener->OnNewIncomingConnection(*this, p->guid.g);
+		printLog("ID_NEW_INCOMING_CONNECTION %s", p->systemAddress.ToString());
 		break;
 	case ID_INCOMPATIBLE_PROTOCOL_VERSION:
 		stream.Read(packetIdentifier);
@@ -86,21 +89,37 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		break;
 	case ID_ADVERTISE_SYSTEM:
 	{
-		shared<Packet> packet = shared<Packet>(new Packet());
-		std::size_t offset = (stream.GetReadOffset() / 8);
-		packet->append(p->data + offset, p->length - offset);
-		m_listener->OnAdvertisement(*this, p->systemAddress.ToString(), p->systemAddress.GetPort(), packet);
+		printLog("ID_ADVERTISE_SYSTEM %s", p->systemAddress.ToString());
+		stream.Read(packetIdentifier);
+		if (packetIdentifier == ID_SERVER_INFO_REQUEST)
+		{
+			printLog("ID_SERVER_INFO_REQUEST");
+
+			ServerInfo info;
+			info.set_name(m_name);
+
+			std::size_t size = (std::size_t) info.ByteSize();
+			m_buffer.Ensure(size);
+			if (info.SerializeToArray(m_buffer.data, m_buffer.size))
+			{
+				RakNet::BitStream tosend;
+				tosend.Write((RakNet::MessageID) ID_SERVER_INFO_RESPONSE);
+				tosend.Write(m_buffer.data, size);
+				m_peer->AdvertiseSystem(
+					p->systemAddress.ToString(false),
+					p->systemAddress.GetPort(),
+					(const char*) tosend.GetData(),
+					tosend.GetNumberOfBytesUsed());
+			}
+		}
 		break;
 	}
 	case ID_CONNECTION_LOST:
-		m_listener->OnConnectionLost(*this, p->guid.g);
+		printLog("ID_CONNECTION_LOST %s", p->systemAddress.ToString());
 		break;
 	case ID_USER_PACKET_ENUM:
 	{
-		shared<Packet> packet = shared<Packet>(new Packet());
-		std::size_t offset = (stream.GetReadOffset() / 8);
-		packet->append(p->data + offset, p->length - offset);
-		m_listener->OnPacket(*this, packet);
+		
 		break;
 	}	
 	default:
@@ -108,7 +127,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 	}
 }
 
-bool RakNetServer::Run(shared<ServerListener> _listener, unsigned short _port, const char* _name, const char* _password)
+bool RakNetServer::Run(unsigned short _port, const char* _name, const char* _password)
 {
 	if (m_peer != nullptr) {
 		return true;
@@ -176,7 +195,6 @@ bool RakNetServer::Run(shared<ServerListener> _listener, unsigned short _port, c
 		m_name = _name;
 	}
 
-	m_listener = _listener;
 	m_pool = std::unique_ptr<TaskPool>(new TaskPool(1, "RakNetServer"));
 	m_peer->SetUserUpdateThread(RaknetThreadUpdate, this);
 
@@ -212,6 +230,7 @@ bool RakNetServer::Close()
 	return false;
 }
 
+/*
 void RakNetServer::Send(std::uint64_t id, shared<Packet> packet)
 {
 	if (m_peer == nullptr)
@@ -239,3 +258,4 @@ void RakNetServer::AdvertiseSystem(const std::string &addr, unsigned short port,
 			(int)packet->getDataSize());
 	});
 }
+*/
