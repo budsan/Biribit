@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
+add_definitions(-DENABLE_IMGUI)
+
 link_directories(
         ${PROJECT_BINARY_DIR}/lib
         /usr/lib

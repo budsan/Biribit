@@ -11,6 +11,10 @@ imgui.ini
 *.opensdf
 *.cbp
 
+# Protobuf
+*.pb.cc
+*.pb.h
+
 # Compiled Object files
 *.slo
 *.lo

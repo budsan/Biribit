@@ -1,0 +1,4 @@
+message ServerInfo
+{
+	required string name = 1;
+}

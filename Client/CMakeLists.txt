@@ -8,11 +8,13 @@ add_library(BiribitClient SHARED
         ${SYSTEM_LIB_CPPS}
         ../Common/Packet.cpp
         ../Common/PrintLog.cpp
+	../Common/Generic.cpp
         BiribitClient.cpp
         BiribitClientExports.cpp
 )
 
 target_link_libraries(BiribitClient
+	ProtoMessages
 	RakNetLibStatic
         rt
         pthread
