@@ -89,12 +89,9 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		break;
 	case ID_ADVERTISE_SYSTEM:
 	{
-		printLog("ID_ADVERTISE_SYSTEM %s", p->systemAddress.ToString());
 		stream.Read(packetIdentifier);
 		if (packetIdentifier == ID_SERVER_INFO_REQUEST)
 		{
-			printLog("ID_SERVER_INFO_REQUEST");
-
 			ServerInfo info;
 			info.set_name(m_name);
 
