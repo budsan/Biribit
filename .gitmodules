@@ -1,0 +1,6 @@
+[submodule "RakNet/RakNet"]
+	path = RakNet/RakNet
+	url = https://github.com/OculusVR/RakNet
+[submodule "ProtoMessages/protobuf"]
+	path = ProtoMessages/protobuf
+	url = https://github.com/google/protobuf
