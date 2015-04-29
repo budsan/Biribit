@@ -2,15 +2,10 @@ cmake_minimum_required(VERSION 2.8)
 
 add_definitions(-DENABLE_IMGUI)
 
-link_directories(
-        ${PROJECT_BINARY_DIR}/lib
-        /usr/lib
-)
-
 add_executable(TestClient.exe
-        ${SYSTEM_LIB_CPPS}
+	${SYSTEM_LIB_CPPS}
 	Commands.cpp
-        CommandsClient.cpp
+	CommandsClient.cpp
 	Console.cpp
 	ConsoleInterface.cpp
 	Game.cpp
@@ -21,24 +16,30 @@ add_executable(TestClient.exe
 	Updater.cpp
 )
 
-add_executable(TerminalClient.exe
-        ${SYSTEM_LIB_CPPS}
-	Commands.cpp
-	Console.cpp
-	Updater.cpp
-	CursesClient.cpp
-)
+if(SYS_OS_WINDOWS)
+	set(TEST_CLIENT_LIBRARIES OpenGL32)
+elseif(SYS_OS_LINUX)
+	set(TEST_CLIENT_LIBRARIES rt pthread GL)
+endif()
 
 target_link_libraries(TestClient.exe
-	rt
-        pthread
-        GL
-        SDL2
+	${TEST_CLIENT_LIBRARIES}
+	SDL2
 	BiribitClient
 )
 
-target_link_libraries(TerminalClient.exe
-        rt
-        pthread
-        BiribitClient
-)
+if(SYS_OS_LINUX)
+	add_executable(TerminalClient.exe
+		${SYSTEM_LIB_CPPS}
+		Commands.cpp
+		Console.cpp
+		Updater.cpp
+		CursesClient.cpp
+	)
+
+	target_link_libraries(TerminalClient.exe
+		rt
+		pthread
+		BiribitClient
+	)
+endif()

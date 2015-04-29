@@ -47,6 +47,10 @@ imgui.ini
 *.userosscache
 *.sln.docstates
 
+# CMake solution results for windows
+*.sln
+*.vcxproj*
+
 # Build results
 [Dd]ebug*/
 [Dd]ebugPublic*/

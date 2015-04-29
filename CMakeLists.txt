@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 2.8)
 
 # define a macro that helps defining an option
 macro(sys_set_option var default type docstring)
@@ -48,6 +48,23 @@ include_directories(
 	${PROJECT_SOURCE_DIR}/RakNet/RakNet/Source
 	${PROJECT_SOURCE_DIR}/Client
 )
+
+if(SYS_OS_WINDOWS)
+	include_directories(
+		${PROJECT_SOURCE_DIR}/TestClient/include
+		${PROJECT_SOURCE_DIR}/ProtoMessages/protobuf/src
+	)
+endif()
+
+if(SYS_OS_WINDOWS)
+	if(ARCH_32BITS)
+		link_directories(${PROJECT_BINARY_DIR}/lib/Win32)
+	elseif(ARCH_64BITS)
+		link_directories(${PROJECT_BINARY_DIR}/lib/x64)
+	endif()
+elseif(SYS_OS_LINUX)
+	link_directories(${PROJECT_BINARY_DIR}/lib/Linux /usr/lib)
+endif()
 
 # Android options
 if(SYS_OS_ANDROID)
