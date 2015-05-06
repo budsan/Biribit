@@ -40,6 +40,7 @@ if(SYS_OS_LINUX)
 	target_link_libraries(TerminalClient.exe
 		rt
 		pthread
+		ncurses
 		BiribitClient
 	)
 endif()

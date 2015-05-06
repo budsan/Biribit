@@ -8,7 +8,6 @@ macro(sys_set_option var default type docstring)
     set(${var} ${${var}} CACHE ${type} ${docstring} FORCE)
 endmacro()
 
-
 # these options have to be set before CMake detects/configures the toolchain
 
 # determine whether to create a debug or release build
@@ -40,6 +39,16 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Config.cmake)
 if(CMAKE_COMPILER_IS_GNUCXX)
   add_definitions(-std=c++11)
 endif()
+
+#-----------------------------------------------------------------------------
+#
+# To fix compilation problem: relocation R_X86_64_32 against `a local symbol' can not be
+# used when making a shared object; recompile with -fPIC
+# See http://www.cmake.org/pipermail/cmake/2007-May/014350.html
+#
+IF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+	ADD_DEFINITIONS(-fPIC)
+ENDIF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
 
 include_directories(
 	${PROJECT_SOURCE_DIR}/include
