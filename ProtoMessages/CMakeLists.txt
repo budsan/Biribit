@@ -6,8 +6,9 @@ if(SYS_OS_WINDOWS)
 	elseif(ARCH_64BITS)
 		set(PROTOBUF_LIBRARY ${PROJECT_BINARY_DIR}/lib/x64)
 	endif()
-	set(PROTOBUF_LIBRARIES libprotobuf)
 	include_directories(${CMAKE_CURRENT_SOURCE_DIR}/protobuf/vsprojects)
+	set(PROTOBUF_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/src/)
+	set(PROTOBUF_LIBRARIES libprotobuf)
 	set(PROTOBUF_PLATFORM_SRC_FILES
 		protobuf/src/google/protobuf/arena.cc
 		protobuf/src/google/protobuf/arenastring.cc

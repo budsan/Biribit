@@ -4,7 +4,9 @@ CMakeFiles
 Makefile
 cmake_install.cmake
 install_manifest.txt
+*.dir/
 
+#imgui
 imgui.ini
 
 *.sdf
@@ -56,6 +58,7 @@ imgui.ini
 [Dd]ebugPublic*/
 [Rr]elease*/
 [Rr]eleases*/
+MinSizeRel*/
 x64/
 x86/
 build/

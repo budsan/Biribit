@@ -33,37 +33,8 @@ endif()
 
 project(Biribit)
 
-message( STATUS "CMAKE_GENERATOR: ${CMAKE_GENERATOR}")
-
-message( STATUS "CMAKE_CL_64: ${CMAKE_CL_64}")
-
 # include the configuration file
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Config.cmake)
-
-include_directories(
-	${PROJECT_SOURCE_DIR}/include
-	${PROJECT_SOURCE_DIR}/Common
-	${PROJECT_SOURCE_DIR}/ProtoMessages
-	${PROJECT_SOURCE_DIR}/RakNet/RakNet/Source
-	${PROJECT_SOURCE_DIR}/Client
-)
-
-if(SYS_OS_WINDOWS)
-	include_directories(
-		${PROJECT_SOURCE_DIR}/TestClient/include
-		${PROJECT_SOURCE_DIR}/ProtoMessages/protobuf/src
-	)
-endif()
-
-if(SYS_OS_WINDOWS)
-	if(ARCH_32BITS)
-		link_directories(${PROJECT_BINARY_DIR}/lib/Win32)
-	elseif(ARCH_64BITS)
-		link_directories(${PROJECT_BINARY_DIR}/lib/x64)
-	endif()
-elseif(SYS_OS_LINUX)
-	link_directories(${PROJECT_BINARY_DIR}/lib/Linux /usr/lib)
-endif()
 
 # Android options
 if(SYS_OS_ANDROID)
@@ -82,7 +53,7 @@ if(SYS_OS_ANDROID)
     endif()
 
     # install everything in $NDK/sources/ because this path is appended by the NDK (convenient)
-    set(CMAKE_INSTALL_PREFIX ${ANDROID_NDK}/sources/biribit)
+    set(CMAKE_INSTALL_PREFIX ${ANDROID_NDK}/sources/${PROJECT_NAME})
 
     # we install libs in a subdirectory named after the ABI (lib/mips/*.so)
     set(LIB_SUFFIX "/${ANDROID_ABI}")
@@ -91,6 +62,11 @@ if(SYS_OS_ANDROID)
     if (ANDROID_STL MATCHES "_shared")
         add_definitions("-DSTL_LIBRARY=${ANDROID_STL}")
     endif()
+
+    # this is a workaround to compile activity without the stl library as a dependency
+    # we save the original compilation command line to restore it later in Macro.cmake
+    set(CMAKE_CXX_CREATE_SHARED_LIBRARY_WITH_STL ${CMAKE_CXX_CREATE_SHARED_LIBRARY})
+    set(CMAKE_CXX_CREATE_SHARED_LIBRARY_WITHOUT_STL "<CMAKE_CXX_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
 else()
     unset(ANDROID_ABI CACHE)
     unset(ANDROID_API_MIN CACHE)
@@ -99,14 +75,54 @@ else()
     unset(ANDROID_NDK CACHE)
 endif()
 
+# enable project folders
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
+
+include_directories(
+	${CMAKE_CURRENT_SOURCE_DIR}/include
+	${CMAKE_CURRENT_SOURCE_DIR}/Common
+	${CMAKE_CURRENT_SOURCE_DIR}/ProtoMessages
+	${CMAKE_CURRENT_SOURCE_DIR}/RakNet/RakNet/Source
+	${CMAKE_CURRENT_SOURCE_DIR/Client
+	${CMAKE_CURRENT_SOURCE_DIR}/ProtoMessages/protobuf/src
+)
+
+if(SYS_OS_WINDOWS)
+	include_directories(${CMAKE_CURRENT_SOURCE_DIR}/TestClient/include)
+	if(ARCH_32BITS)
+		link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/Win32)
+	elseif(ARCH_64BITS)
+		link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/x64)
+	endif()
+elseif(SYS_OS_LINUX)
+	link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/Linux /usr/lib)
+endif()
+
 # remove SL security warnings with Visual C++
 if(SYS_COMPILER_MSVC)
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
 endif()
 
+if(SYS_COMPILER_IS_GNUCXX)
+	add_definitions(-std=c++11)
+#-----------------------------------------------------------------------------
+#
+# To fix compilation problem: relocation R_X86_64_32 against `a local symbol' can not be
+# used when making a shared object; recompile with -fPIC
+# See http://www.cmake.org/pipermail/cmake/2007-May/014350.html
+#
+	IF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+		ADD_DEFINITIONS(-fPIC)
+	ENDIF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )	
+endif()
+
 add_subdirectory(Common)
 add_subdirectory(RakNet)
 add_subdirectory(ProtoMessages)
-add_subdirectory(Server)
 add_subdirectory(Client)
-add_subdirectory(TestClient)
+
+if (NOT SYS_OS_ANDROID)
+	add_subdirectory(Server)
+	add_subdirectory(TestClient)
+endif()
