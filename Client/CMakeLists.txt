@@ -2,9 +2,6 @@ cmake_minimum_required(VERSION 2.8)
 
 add_library(BiribitClient SHARED
 	${SYSTEM_LIB_CPPS}
-	../Common/Packet.cpp
-	../Common/PrintLog.cpp
-	../Common/Generic.cpp
 	BiribitClient.cpp
 	BiribitClientExports.cpp
 )
@@ -17,6 +14,7 @@ endif()
 
 target_link_libraries(BiribitClient
 	${CLIENT_LIBRARIES}
+	BiribitCommon
 	ProtoMessages
 	RakNetLibStatic
 )

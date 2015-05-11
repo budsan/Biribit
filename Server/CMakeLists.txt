@@ -2,9 +2,6 @@ cmake_minimum_required(VERSION 2.8)
 
 add_executable(BiribitServer.exe
 	${SYSTEM_LIB_CPPS}
-	../Common/Packet.cpp
-	../Common/PrintLog.cpp
-	../Common/Generic.cpp
 	RakNetServer.cpp
 	main.cpp
 )
@@ -17,6 +14,7 @@ endif()
 
 target_link_libraries(BiribitServer.exe
 	${SERVER_LIBRARIES}
+	BiribitCommon
 	ProtoMessages
 	RakNetLibStatic
 )

@@ -133,7 +133,11 @@ int ConsoleInterface::TextEditCallback(ImGuiTextEditCallbackData* data)
 	}
 
 	if (data->BufDirty) {
+#if defined(WIN32)
+		strcpy_s(data->Buf, data->BufSize, editing().c_str());
+#else
 		snprintf(data->Buf, data->BufSize, "%s", editing().c_str());
+#endif
 		data->CursorPos = cursorPos;
 	}
 

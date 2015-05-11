@@ -70,6 +70,19 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
     if(${GCC_MACHINE} MATCHES ".*w64.*")
         set(SYS_COMPILER_GCC_W64 1)
     endif()
+
+	#-----------------------------------------------------------------------------
+	#
+	# To fix compilation problem: relocation R_X86_64_32 against `a local symbol' can not be
+	# used when making a shared object; recompile with -fPIC
+	# See http://www.cmake.org/pipermail/cmake/2007-May/014350.html
+	#
+	IF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+		ADD_DEFINITIONS(-fPIC)
+	ENDIF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+
+	#c++11 for gcc
+	add_definitions(-std=c++11)
 elseif(MSVC)
     set(SYS_COMPILER_MSVC 1)
     if(MSVC_VERSION EQUAL 1400)
@@ -86,13 +99,4 @@ elseif(MSVC)
 else()
     message(FATAL_ERROR "Unsupported compiler")
     return()
-endif()
-
-# define the install directory for miscellaneous files
-if(SYS_OS_WINDOWS OR SYS_OS_IOS)
-    set(INSTALL_MISC_DIR .)
-elseif(SYS_OS_LINUX OR SYS_OS_FREEBSD OR SYS_OS_MACOSX)
-    set(INSTALL_MISC_DIR share/SYS)
-elseif(SYS_OS_ANDROID)
-    set(INSTALL_MISC_DIR ${ANDROID_NDK}/sources/biribit)
 endif()

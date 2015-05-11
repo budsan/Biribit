@@ -7,19 +7,18 @@ if(SYS_OS_WINDOWS)
 		set(PROTOBUF_LIBRARY ${PROJECT_BINARY_DIR}/lib/x64)
 	endif()
 	set(PROTOBUF_LIBRARIES libprotobuf)
+	include_directories(${CMAKE_CURRENT_SOURCE_DIR}/protobuf/vsprojects)
+	set(PROTOBUF_PLATFORM_SRC_FILES
+		protobuf/src/google/protobuf/arena.cc
+		protobuf/src/google/protobuf/arenastring.cc
+		protobuf/src/google/protobuf/io/strtod.cc
+		protobuf/src/google/protobuf/map_field.cc
+		protobuf/src/google/protobuf/stubs/atomicops_internals_x86_gcc.cc
+		protobuf/src/google/protobuf/stubs/atomicops_internals_x86_msvc.cc
+		protobuf/src/google/protobuf/stubs/stringprintf.cc)
 endif()
 
-set(PROTOBUF_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/ProtoMessages/protobuf/src)
-
-include(FindProtobuf)
-find_package(Protobuf REQUIRED)
-include_directories(${PROTOBUF_INCLUDE_DIR})
-	
-FILE(GLOB ALL_PROTO_SRCS *.proto)
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${ALL_PROTO_SRCS})
-
-add_definitions(-DGOOGLE_PROTOBUF_NO_RTTI)
-add_library(ProtoMessages STATIC
+set(PROTOBUF_COMMON_SRC_FILES
 	protobuf/src/google/protobuf/stubs/common.cc
 	protobuf/src/google/protobuf/stubs/once.cc
 	protobuf/src/google/protobuf/extension_set.cc
@@ -50,8 +49,23 @@ add_library(ProtoMessages STATIC
 	protobuf/src/google/protobuf/io/tokenizer.cc 
 	protobuf/src/google/protobuf/io/zero_copy_stream_impl.cc
 	protobuf/src/google/protobuf/compiler/importer.cc
-	protobuf/src/google/protobuf/compiler/parser.cc
+	protobuf/src/google/protobuf/compiler/parser.cc)
+
+set(PROTOBUF_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/src)
+
+include(FindProtobuf)
+find_package(Protobuf REQUIRED)
+include_directories(${PROTOBUF_INCLUDE_DIR})
+	
+FILE(GLOB ALL_PROTO_SRCS *.proto)
+PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${ALL_PROTO_SRCS})
+
+add_definitions(-DGOOGLE_PROTOBUF_NO_RTTI)
+add_library(ProtoMessages STATIC
+	${PROTOBUF_COMMON_SRC_FILES}
+	${PROTOBUF_PLATFORM_SRC_FILES}
 	${PROTO_SRCS}
 	${PROTO_HDRS}
 )
+
 

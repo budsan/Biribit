@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.3)
 
 # define a macro that helps defining an option
 macro(sys_set_option var default type docstring)
@@ -33,22 +33,12 @@ endif()
 
 project(Biribit)
 
+message( STATUS "CMAKE_GENERATOR: ${CMAKE_GENERATOR}")
+
+message( STATUS "CMAKE_CL_64: ${CMAKE_CL_64}")
+
 # include the configuration file
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Config.cmake)
-
-if(CMAKE_COMPILER_IS_GNUCXX)
-  add_definitions(-std=c++11)
-endif()
-
-#-----------------------------------------------------------------------------
-#
-# To fix compilation problem: relocation R_X86_64_32 against `a local symbol' can not be
-# used when making a shared object; recompile with -fPIC
-# See http://www.cmake.org/pipermail/cmake/2007-May/014350.html
-#
-IF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
-	ADD_DEFINITIONS(-fPIC)
-ENDIF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
 
 include_directories(
 	${PROJECT_SOURCE_DIR}/include
@@ -114,6 +104,7 @@ if(SYS_COMPILER_MSVC)
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
 endif()
 
+add_subdirectory(Common)
 add_subdirectory(RakNet)
 add_subdirectory(ProtoMessages)
 add_subdirectory(Server)
