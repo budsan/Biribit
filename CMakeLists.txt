@@ -82,10 +82,10 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
 include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/include
 	${CMAKE_CURRENT_SOURCE_DIR}/Common
-	${CMAKE_CURRENT_SOURCE_DIR}/ProtoMessages
-	${CMAKE_CURRENT_SOURCE_DIR}/RakNet/RakNet/Source
-	${CMAKE_CURRENT_SOURCE_DIR/Client
+	${CMAKE_CURRENT_BINARY_DIR}/ProtoMessages
 	${CMAKE_CURRENT_SOURCE_DIR}/ProtoMessages/protobuf/src
+	${CMAKE_CURRENT_SOURCE_DIR}/RakNet/RakNet/Source
+	${CMAKE_CURRENT_SOURCE_DIR}/Client
 )
 
 if(SYS_OS_WINDOWS)
@@ -104,17 +104,17 @@ if(SYS_COMPILER_MSVC)
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
 endif()
 
-if(SYS_COMPILER_IS_GNUCXX)
-	add_definitions(-std=c++11)
+if(SYS_COMPILER_GCC)
+    add_definitions(-std=c++11)
 #-----------------------------------------------------------------------------
 #
 # To fix compilation problem: relocation R_X86_64_32 against `a local symbol' can not be
 # used when making a shared object; recompile with -fPIC
 # See http://www.cmake.org/pipermail/cmake/2007-May/014350.html
 #
-	IF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
-		ADD_DEFINITIONS(-fPIC)
-	ENDIF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )	
+    IF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+        ADD_DEFINITIONS(-fPIC)
+    ENDIF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )	
 endif()
 
 add_subdirectory(Common)

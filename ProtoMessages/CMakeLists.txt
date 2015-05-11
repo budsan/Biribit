@@ -16,7 +16,19 @@ if(SYS_OS_WINDOWS)
 		protobuf/src/google/protobuf/map_field.cc
 		protobuf/src/google/protobuf/stubs/atomicops_internals_x86_gcc.cc
 		protobuf/src/google/protobuf/stubs/atomicops_internals_x86_msvc.cc
-		protobuf/src/google/protobuf/stubs/stringprintf.cc)
+		protobuf/src/google/protobuf/stubs/stringprintf.cc
+	)
+else()
+	include_directories(${CMAKE_CURRENT_SOURCE_DIR}/protobuf/)
+	set(PROTOBUF_PLATFORM_SRC_FILES
+		protobuf/src/google/protobuf/arena.cc
+		protobuf/src/google/protobuf/arenastring.cc
+		protobuf/src/google/protobuf/io/strtod.cc
+		protobuf/src/google/protobuf/map_field.cc
+		protobuf/src/google/protobuf/stubs/atomicops_internals_x86_gcc.cc
+		protobuf/src/google/protobuf/stubs/atomicops_internals_x86_msvc.cc
+		protobuf/src/google/protobuf/stubs/stringprintf.cc
+	)
 endif()
 
 set(PROTOBUF_COMMON_SRC_FILES
