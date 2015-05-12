@@ -19,6 +19,25 @@ class RakNetServer
 	std::string m_name;
 	bool m_passwordProtected;
 
+	struct Client
+	{
+		typedef std::size_t id_t;
+		enum { UNASSIGNED_ID = 0 };
+
+		std::size_t id;
+		RakNet::SystemAddress addr;
+		std::string name;
+	};
+
+	std::vector<unique<Client>> m_clients;
+	std::map<RakNet::SystemAddress, std::size_t> m_clientAddrMap;
+	std::map<std::string, std::size_t> m_clientNameMap;
+
+	void NewClient(RakNet::SystemAddress addr);
+	void RemoveClient(RakNet::SystemAddress addr);
+	void SetClientName(RakNet::SystemAddress addr, const std::string& name);
+
+
 	unique<TaskPool> m_pool;
 	Generic::TempBuffer m_buffer;
 

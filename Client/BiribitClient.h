@@ -19,7 +19,7 @@ struct API_EXPORT ServerDescription
 
 struct API_EXPORT ServerConnection
 {
-	typedef std::uint32_t id_t;
+	typedef std::size_t id_t;
 	enum { UNASSIGNED_ID = 0 };
 
 	id_t id;

@@ -12,6 +12,7 @@
 #include "RakSleep.h"
 #include "PacketLogger.h"
 
+#include <debug.h>
 #include <Generic.h>
 #include <BiribitMessageIdentifiers.h>
 
@@ -40,9 +41,72 @@ template<int N> int sizeof_string_array(const char* (&s)[N]) { return N; }
 const unsigned short SERVER_DEFAULT_PORT = 8287;
 const unsigned short SERVER_MAX_NUM_CLIENTS = 42;
 
-RakNetServer::RakNetServer() : m_peer(nullptr)
+RakNetServer::RakNetServer()
+	: m_peer(nullptr)
+	, m_clients(1)
 {
 
+}
+
+void RakNetServer::NewClient(RakNet::SystemAddress addr)
+{
+	BIRIBIT_ASSERT(m_clientAddrMap.find(addr) == m_clientAddrMap.end());
+
+	Client::id_t i = 1;
+	for (; i < m_clients.size() && m_clients[i] != nullptr; i++);
+
+	if (i < m_clients.size())
+		m_clients[i] = unique<Client>(new Client());
+	else
+		m_clients.push_back(unique<Client>(new Client()));
+
+	m_clients[i]->addr = addr;
+	m_clientAddrMap[addr] = i;
+}
+
+void RakNetServer::RemoveClient(RakNet::SystemAddress addr)
+{
+	auto it = m_clientAddrMap.find(addr);
+	BIRIBIT_ASSERT(it != m_clientAddrMap.end());
+	BIRIBIT_ASSERT(it->second < m_clients.size());
+	BIRIBIT_ASSERT(m_clients[it->second] != nullptr);
+
+	unique<Client>& client = m_clients[it->second];
+	if (!client->name.empty())
+	{
+		std::size_t erased_count = m_clientNameMap.erase(client->name);
+		BIRIBIT_ASSERT(erased_count > 0);
+	}
+	
+	m_clients[it->second] = nullptr;
+	m_clientAddrMap.erase(it);
+}
+
+void RakNetServer::SetClientName(RakNet::SystemAddress addr, const std::string& name)
+{
+	auto itA = m_clientAddrMap.find(addr);
+	auto itN = m_clientNameMap.find(name);
+	BIRIBIT_ASSERT(itA != m_clientAddrMap.end());
+
+	if (itN != m_clientNameMap.end())
+	{
+		if (itA->second != itN->second)
+		{
+			//Another client have same name.
+			//TODO: Send NAME_IN_USE
+		}
+	}
+	else
+	{
+		m_clientNameMap[name] = itA->second;
+		BIRIBIT_ASSERT(itA->second < m_clients.size());
+		BIRIBIT_ASSERT(m_clients[itA->second] != nullptr);
+		m_clients[itA->second]->name = name;
+
+		//Name changed successfully.
+		//TODO: Send NAME_CHANGE_SUCCESS
+		//TODO: Broadcast CLIENT_NAME_CHANGED
+	}
 }
 
 void RakNetServer::RaknetThreadUpdate(RakNet::RakPeerInterface *peer, void* data)
@@ -78,10 +142,12 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 	switch (packetIdentifier)
 	{
 	case ID_DISCONNECTION_NOTIFICATION:
-		printLog("ID_DISCONNECTION_NOTIFICATION %s", p->systemAddress.ToString());
+		printLog("Client %s disconnected.", p->systemAddress.ToString());
+		RemoveClient(p->systemAddress);
 		break;
 	case ID_NEW_INCOMING_CONNECTION:
-		printLog("ID_NEW_INCOMING_CONNECTION %s", p->systemAddress.ToString());
+		printLog("New client connected from %s.", p->systemAddress.ToString());
+		NewClient(p->systemAddress);
 		break;
 	case ID_INCOMPATIBLE_PROTOCOL_VERSION:
 		stream.Read(packetIdentifier);
@@ -107,6 +173,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 	}
 	case ID_CONNECTION_LOST:
 		printLog("ID_CONNECTION_LOST %s", p->systemAddress.ToString());
+		RemoveClient(p->systemAddress);
 		break;
 	case ID_SERVER_INFO_REQUEST:
 	{
