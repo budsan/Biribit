@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 add_definitions(-DENABLE_IMGUI)
 
-add_executable(TestClient.exe
+add_executable(TestClient
 	${SYSTEM_LIB_CPPS}
 	Commands.cpp
 	CommandsClient.cpp
@@ -22,14 +22,14 @@ elseif(SYS_OS_LINUX)
 	set(TEST_CLIENT_LIBRARIES rt pthread GL)
 endif()
 
-target_link_libraries(TestClient.exe
+target_link_libraries(TestClient
 	${TEST_CLIENT_LIBRARIES}
 	SDL2
 	BiribitClient
 )
 
 if(SYS_OS_LINUX)
-	add_executable(TerminalClient.exe
+	add_executable(TerminalClient
 		${SYSTEM_LIB_CPPS}
 		Commands.cpp
 		Console.cpp
@@ -37,7 +37,7 @@ if(SYS_OS_LINUX)
 		CursesClient.cpp
 	)
 
-	target_link_libraries(TerminalClient.exe
+	target_link_libraries(TerminalClient
 		rt
 		pthread
 		ncurses

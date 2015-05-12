@@ -117,6 +117,10 @@ if(SYS_COMPILER_GCC)
     ENDIF( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )	
 endif()
 
+set(PROJECT_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/bin/)
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_OUTPUT_PATH} CACHE PATH "Build directory" FORCE)
+set(LIBRARY_OUTPUT_PATH ${PROJECT_OUTPUT_PATH} CACHE PATH "Build directory" FORCE)
+
 add_subdirectory(Common)
 add_subdirectory(RakNet)
 add_subdirectory(ProtoMessages)

@@ -94,34 +94,58 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		{
 			ServerInfo info;
 			info.set_name(m_name);
-
-			std::size_t size = (std::size_t) info.ByteSize();
-			m_buffer.Ensure(size);
-			if (info.SerializeToArray(m_buffer.data, m_buffer.size))
-			{
-				RakNet::BitStream tosend;
-				tosend.Write((RakNet::MessageID) ID_SERVER_INFO_RESPONSE);
-				tosend.Write(m_buffer.data, size);
+			info.set_password_protected(m_passwordProtected);
+			RakNet::BitStream bstream;
+			if (WriteMessage(bstream, ID_SERVER_INFO_RESPONSE, info))
 				m_peer->AdvertiseSystem(
 					p->systemAddress.ToString(false),
 					p->systemAddress.GetPort(),
-					(const char*) tosend.GetData(),
-					tosend.GetNumberOfBytesUsed());
-			}
+					(const char*)bstream.GetData(),
+					bstream.GetNumberOfBytesUsed());
 		}
 		break;
 	}
 	case ID_CONNECTION_LOST:
 		printLog("ID_CONNECTION_LOST %s", p->systemAddress.ToString());
 		break;
-	case ID_USER_PACKET_ENUM:
+	case ID_SERVER_INFO_REQUEST:
 	{
+		ServerInfo info;
+		info.set_name(m_name);
+		info.set_password_protected(m_passwordProtected);
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_SERVER_INFO_RESPONSE, info))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, p->systemAddress, false);
 		
 		break;
 	}	
 	default:
 		break;
 	}
+}
+
+bool RakNetServer::WriteMessage(RakNet::BitStream& bstream,
+	RakNet::MessageID msgId,
+	::google::protobuf::MessageLite& msg)
+{
+	std::size_t size = (std::size_t) msg.ByteSize();
+	m_buffer.Ensure(size);
+	if (msg.SerializeToArray(m_buffer.data, m_buffer.size))
+	{
+		bstream.Write((RakNet::MessageID) msgId);
+		bstream.Write(m_buffer.data, size);
+		return true;
+	}
+
+	return false;
+}
+
+template<typename T> bool RakNetServer::ReadMessage(T& msg, RakNet::BitStream& bstream)
+{
+	std::size_t size = BITS_TO_BYTES(bstream.GetNumberOfUnreadBits());
+	m_buffer.Ensure(size);
+	bstream.Read(m_buffer.data, size);
+	return msg.ParseFromArray(m_buffer.data, size);
 }
 
 bool RakNetServer::Run(unsigned short _port, const char* _name, const char* _password)
@@ -133,9 +157,10 @@ bool RakNetServer::Run(unsigned short _port, const char* _name, const char* _pas
 	m_peer = RakNet::RakPeerInterface::GetInstance();
 	m_peer->SetTimeoutTime(10000, RakNet::UNASSIGNED_SYSTEM_ADDRESS);
 
-	if (_password != NULL)
+	m_passwordProtected = (_password != NULL);
+	if (m_passwordProtected)
 		m_peer->SetIncomingPassword(_password, (int)strlen(_password));
-
+		
 	if (_port == 0)
 		_port = SERVER_DEFAULT_PORT;
 

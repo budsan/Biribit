@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-add_executable(BiribitServer.exe
+add_executable(BiribitServer
 	${SYSTEM_LIB_CPPS}
 	RakNetServer.cpp
 	main.cpp
@@ -12,7 +12,7 @@ elseif(SYS_OS_LINUX)
 	set(SERVER_LIBRARIES rt pthread GL)
 endif()
 
-target_link_libraries(BiribitServer.exe
+target_link_libraries(BiribitServer
 	${SERVER_LIBRARIES}
 	BiribitCommon
 	ProtoMessages

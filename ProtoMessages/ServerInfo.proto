@@ -3,4 +3,5 @@ option optimize_for = LITE_RUNTIME;
 message ServerInfo
 {
 	required string name = 1;
+	required bool password_protected = 2;
 }

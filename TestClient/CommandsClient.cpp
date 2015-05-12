@@ -50,19 +50,59 @@ class ClientUpdater : public UpdaterListener
 		if (ImGui::Button("Refresh servers"))
 			client->RefreshDiscoverInfo();
 
-		ImGui::BeginChild("ScrollingRegion", ImVec2(0, -ImGui::GetTextLineHeightWithSpacing() * 2));
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
+		ImGui::PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 5.0f);	
+		std::vector<const char*> server_listbox;
+		std::vector<std::string> server_listbox_str;
 		const std::vector<ServerDescription>& info = client->GetDiscoverInfo();
 		for (auto it = info.begin(); it != info.end(); it++)
 		{
 			const ServerDescription& serverInfo = *it;
-			ImVec4 col(1, 1, 1, 1);
-			ImGui::PushStyleColor(ImGuiCol_Text, col);
-			ImGui::TextUnformatted((it->name + ", ping " + std::to_string(it->ping)).c_str());
-			ImGui::PopStyleColor();
+			server_listbox_str.push_back(it->name + ", ping " + std::to_string(it->ping) + (it->passwordProtected ? ". Password protected." : ". No password."));
+			server_listbox.push_back(server_listbox_str.back().c_str());
 		}
+
+		static int server_listbox_current = 0;
+		if (!server_listbox.empty())
+		{
+			if (server_listbox_current > server_listbox.size())
+				server_listbox_current = 0;
+			ImGui::ListBox("Servers", &server_listbox_current, &server_listbox[0], server_listbox.size(), 4);
+
+			if (ImGui::Button("Connect"))
+			{
+				const ServerDescription& serverInfo = info[server_listbox_current];
+				client->Connect(serverInfo.addr.c_str(), serverInfo.port);
+			}
+		}
+
+		std::vector<const char*> connections_listbox;
+		std::vector<std::string> connections_listbox_str;
+		const std::vector<ServerConnection>& conns = client->GetConnections();
+		for (auto it = conns.begin(); it != conns.end(); it++)
+		{
+			const ServerConnection& connection = *it;
+			connections_listbox_str.push_back(std::to_string(it->id) + ": " + it->name);
+			connections_listbox.push_back(connections_listbox_str.back().c_str());
+		}
+
+		static int connections_listbox_current = 0;
+		if (!connections_listbox.empty())
+		{
+			if (connections_listbox_current > connections_listbox.size())
+				connections_listbox_current = 0;
+			ImGui::ListBox("Connections", &connections_listbox_current, &connections_listbox[0], connections_listbox.size(), 4);
+
+			if (ImGui::Button("Disconnect"))
+			{
+				const ServerConnection& connection = conns[connections_listbox_current];
+				client->Disconnect(connection.id);
+			}
+
+			if (ImGui::Button("Disconnect all"))
+				client->Disconnect();
+		}
+
 		ImGui::PopStyleVar();
-		ImGui::EndChild();
 
 		ImGui::End();
 	}

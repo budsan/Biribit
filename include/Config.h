@@ -79,6 +79,10 @@
 
 #endif
 
+#undef BIRIBIT_DISALLOW_EVIL_CONSTRUCTORS
+#define BIRIBIT_DISALLOW_EVIL_CONSTRUCTORS(TypeName)    \
+  TypeName(const TypeName&) = delete;                   \
+  TypeName& operator=(const TypeName&) = delete
 
 ////////////////////////////////////////////////////////////
 // Define helpers to create portable import / export macros for each module

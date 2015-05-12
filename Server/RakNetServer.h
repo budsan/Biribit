@@ -11,10 +11,13 @@
 #include <Types.h>
 #include <Generic.h>
 
+#include <BiribitMessageIdentifiers.h>
+
 class RakNetServer
 {
 	RakNet::RakPeerInterface *m_peer;
 	std::string m_name;
+	bool m_passwordProtected;
 
 	unique<TaskPool> m_pool;
 	Generic::TempBuffer m_buffer;
@@ -22,6 +25,12 @@ class RakNetServer
 	static void RaknetThreadUpdate(RakNet::RakPeerInterface *peer, void* data);
 	void RakNetUpdated();
 	void HandlePacket(RakNet::Packet*);
+
+	bool WriteMessage(RakNet::BitStream& bstream,
+		RakNet::MessageID msgId,
+		::google::protobuf::MessageLite& msg);
+
+	template<typename T> bool ReadMessage(T& msg, RakNet::BitStream& bstream);
 
 public:
 
