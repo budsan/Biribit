@@ -66,7 +66,7 @@ public:
 
 	ServerConnectionPriv();
 
-	bool Null();
+	bool isNull();
 };
 
 ServerConnectionPriv::ServerConnectionPriv()
@@ -74,7 +74,7 @@ ServerConnectionPriv::ServerConnectionPriv()
 {
 }
 
-bool ServerConnectionPriv::Null()
+bool ServerConnectionPriv::isNull()
 {
 	return addr == RakNet::UNASSIGNED_SYSTEM_ADDRESS;
 }
@@ -229,11 +229,8 @@ void BiribitClientImpl::Disconnect(ServerConnection::id_t id)
 {
 	m_pool->enqueue([this, id]()
 	{
-		if (id < m_connections.size() && !m_connections[id].Null())
-		{
+		if (id < m_connections.size() && !m_connections[id].isNull())
 			m_peer->CloseConnection(m_connections[id].addr, true);
-			m_connections[id].addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
-		}
 	});
 }
 
@@ -243,11 +240,8 @@ void BiribitClientImpl::Disconnect()
 	{
 		for (std::size_t i = 1; i < m_connections.size(); i++)
 		{
-			if (!m_connections[i].Null())
-			{
+			if (!m_connections[i].isNull())
 				m_peer->CloseConnection(m_connections[i].addr, true);
-				m_connections[i].addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
-			}
 		}
 	});
 }
@@ -258,7 +252,7 @@ void BiribitClientImpl::DiscoverOnLan(unsigned short port)
 		port = SERVER_DEFAULT_PORT;
 
 	m_pool->enqueue([this, port]() {
-		printLog("Discovering on Lan in port %d...", port);
+		printLog("Discovering on LAN in port %d...", port);
 		m_peer->Ping("255.255.255.255", port, false);
 	});
 }
@@ -331,7 +325,7 @@ const std::vector<ServerConnection>& BiribitClientImpl::GetConnections()
 
 			for (auto it = (++m_connections.begin()); it != m_connections.end(); it++)
 			{
-				if (!it->Null()) {
+				if (!it->isNull()) {
 					back.push_back(it->data);
 				}
 			}
@@ -386,7 +380,6 @@ void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	switch (packetIdentifier)
 	{
 	case ID_DISCONNECTION_NOTIFICATION:
-		printLog("ID_DISCONNECTION_NOTIFICATION");
 		DisconnectFrom(pPacket);
 		break;
 	case ID_ALREADY_CONNECTED:
@@ -489,7 +482,7 @@ void BiribitClientImpl::ConnectedAt(RakNet::Packet* pPacket)
 	std::size_t i = 1;
 	for (; i < m_connections.size(); i++)
 	{
-		if (m_connections[i].Null())
+		if (m_connections[i].isNull())
 		{
 			ServerConnectionPriv& sc = m_connections[i];
 			sc.addr = pPacket->systemAddress;
@@ -525,6 +518,9 @@ void BiribitClientImpl::DisconnectFrom(RakNet::Packet* pPacket)
 	if (sd.id != ServerConnection::UNASSIGNED_ID)
 	{
 		ServerConnectionPriv& sc = m_connections[sd.id];
+		if (sd.valid)
+			printLog("Disconnected from %s.", sc.data.name.c_str());
+
 		sc.addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
 		sd.id = ServerConnection::UNASSIGNED_ID;
 	}
