@@ -53,10 +53,10 @@ class ClientUpdater : public UpdaterListener
 		ImGui::PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 5.0f);	
 		std::vector<const char*> server_listbox;
 		std::vector<std::string> server_listbox_str;
-		const std::vector<ServerDescription>& info = client->GetDiscoverInfo();
+		const std::vector<ServerInfo>& info = client->GetDiscoverInfo();
 		for (auto it = info.begin(); it != info.end(); it++)
 		{
-			const ServerDescription& serverInfo = *it;
+			const ServerInfo& serverInfo = *it;
 			server_listbox_str.push_back(it->name + ", ping " + std::to_string(it->ping) + (it->passwordProtected ? ". Password protected." : ". No password."));
 			server_listbox.push_back(server_listbox_str.back().c_str());
 		}
@@ -70,7 +70,7 @@ class ClientUpdater : public UpdaterListener
 
 			if (ImGui::Button("Connect"))
 			{
-				const ServerDescription& serverInfo = info[server_listbox_current];
+				const ServerInfo& serverInfo = info[server_listbox_current];
 				client->Connect(serverInfo.addr.c_str(), serverInfo.port);
 			}
 		}

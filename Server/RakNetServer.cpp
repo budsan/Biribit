@@ -60,8 +60,37 @@ RakNetServer::Client::id_t RakNetServer::NewClient(RakNet::SystemAddress addr)
 	else
 		m_clients.push_back(unique<Client>(new Client()));
 
+	m_clients[i]->appid.clear();
 	m_clients[i]->addr = addr;
 	m_clientAddrMap[addr] = i;
+
+	int perm_name = 1;
+	while (perm_name != 0)
+	{
+		using clock = std::chrono::system_clock;
+		auto timer = clock::now();
+		auto now_c = clock::to_time_t(timer) + perm_name;
+
+		int nameID = now_c % sizeof_string_array(randomNames);
+		std::string name = randomNames[nameID] + std::to_string(std::hash<int>()(i+nameID)& 0x7F);
+
+		auto itName = m_clientNameMap.find(name);
+		if (itName == m_clientNameMap.end())
+		{
+			m_clientNameMap[name] = i;
+			m_clients[i]->name = name;
+			perm_name = 0;
+		}
+		else
+			perm_name++;
+	}
+
+	Proto::Client proto_client;
+	PopulateProtoClient(m_clients[i], &proto_client);
+	RakNet::BitStream bstream;
+	if (WriteMessage(bstream, ID_CLIENT_STATUS_UPDATED, proto_client))
+		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+
 	return i;
 }
 
@@ -73,6 +102,9 @@ void RakNetServer::RemoveClient(RakNet::SystemAddress addr)
 	BIRIBIT_ASSERT(m_clients[it->second] != nullptr);
 
 	unique<Client>& client = m_clients[it->second];
+	Proto::Client proto_client;
+	PopulateProtoClient(client, &proto_client);
+
 	if (!client->name.empty())
 	{
 		std::size_t erased_count = m_clientNameMap.erase(client->name);
@@ -81,33 +113,69 @@ void RakNetServer::RemoveClient(RakNet::SystemAddress addr)
 	
 	m_clients[it->second] = nullptr;
 	m_clientAddrMap.erase(it);
+
+	RakNet::BitStream bstream;
+	if (WriteMessage(bstream, ID_CLIENT_DISCONNECTED, proto_client))
+		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 }
 
-void RakNetServer::SetClientName(RakNet::SystemAddress addr, const std::string& name)
+void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate* proto_update)
 {
-	auto itA = m_clientAddrMap.find(addr);
-	auto itN = m_clientNameMap.find(name);
-	BIRIBIT_ASSERT(itA != m_clientAddrMap.end());
-
-	if (itN != m_clientNameMap.end())
+	bool updated = false;
+	auto itAddr = m_clientAddrMap.find(addr);
+	BIRIBIT_ASSERT(itAddr != m_clientAddrMap.end());
+	BIRIBIT_ASSERT(itAddr->second < m_clients.size());
+	BIRIBIT_ASSERT(m_clients[itAddr->second] != nullptr);
+	
+	if (proto_update->has_name())
 	{
-		if (itA->second != itN->second)
+		const std::string& name = proto_update->name();
+		auto itName = m_clientNameMap.find(name);
+		if (itName != m_clientNameMap.end())
 		{
-			//Another client have same name.
-			//TODO: Send NAME_IN_USE
+			if (itAddr->second != itName->second)
+			{
+				// some other client is using that name
+				RakNet::BitStream bstream;
+				bstream.Write((RakNet::MessageID)ID_CLIENT_NAME_IN_USE);
+				m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
+			}
+		}
+		else
+		{
+			m_clientNameMap[name] = itAddr->second;
+			m_clients[itAddr->second]->name = name;
+			updated = true;
 		}
 	}
-	else
-	{
-		m_clientNameMap[name] = itA->second;
-		BIRIBIT_ASSERT(itA->second < m_clients.size());
-		BIRIBIT_ASSERT(m_clients[itA->second] != nullptr);
-		m_clients[itA->second]->name = name;
 
-		//Name changed successfully.
-		//TODO: Send NAME_CHANGE_SUCCESS
-		//TODO: Broadcast CLIENT_NAME_CHANGED
+	if (proto_update->has_appid())
+	{
+		m_clients[itAddr->second]->appid = proto_update->appid();
+		updated = true;
 	}
+
+	if (updated)
+	{
+		Proto::Client proto_client;
+		PopulateProtoClient(m_clients[itAddr->second], &proto_client);
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_CLIENT_STATUS_UPDATED, proto_client))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+	}
+}
+
+void RakNetServer::PopulateProtoServerInfo(Proto::ServerInfo* proto_info)
+{
+	proto_info->set_name(m_name);
+	proto_info->set_password_protected(m_passwordProtected);
+}
+
+void RakNetServer::PopulateProtoClient(unique<Client>& client, Proto::Client* proto_client)
+{
+	proto_client->set_id(client->id);
+	proto_client->set_name(client->name);
+	proto_client->set_appid(client->appid);
 }
 
 void RakNetServer::RaknetThreadUpdate(RakNet::RakPeerInterface *peer, void* data)
@@ -149,8 +217,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 	case ID_NEW_INCOMING_CONNECTION:
 		{
 			Client::id_t id = NewClient(p->systemAddress);
-			SetClientName(p->systemAddress, "guest" + std::to_string(id));
-			printLog("New client connected from %s. Id(%d) name(%s).", p->systemAddress.ToString(), id, m_clients[id]->name);
+			printLog("New client connected from %s. Id(%d) name(%s).", p->systemAddress.ToString(), id, m_clients[id]->name.c_str());
 		}
 		break;
 	case ID_INCOMPATIBLE_PROTOCOL_VERSION:
@@ -162,11 +229,10 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		stream.Read(packetIdentifier);
 		if (packetIdentifier == ID_SERVER_INFO_REQUEST)
 		{
-			ServerInfo info;
-			info.set_name(m_name);
-			info.set_password_protected(m_passwordProtected);
+			Proto::ServerInfo proto_info;
+			PopulateProtoServerInfo(&proto_info);
 			RakNet::BitStream bstream;
-			if (WriteMessage(bstream, ID_SERVER_INFO_RESPONSE, info))
+			if (WriteMessage(bstream, ID_SERVER_INFO_RESPONSE, proto_info))
 				m_peer->AdvertiseSystem(
 					p->systemAddress.ToString(false),
 					p->systemAddress.GetPort(),
@@ -181,15 +247,54 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		break;
 	case ID_SERVER_INFO_REQUEST:
 	{
-		ServerInfo info;
-		info.set_name(m_name);
-		info.set_password_protected(m_passwordProtected);
+		Proto::ServerInfo proto_info;
+		PopulateProtoServerInfo(&proto_info);
 		RakNet::BitStream bstream;
-		if (WriteMessage(bstream, ID_SERVER_INFO_RESPONSE, info))
+		if (WriteMessage(bstream, ID_SERVER_INFO_RESPONSE, proto_info))
 			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, p->systemAddress, false);
 		
 		break;
+	}
+	case ID_SERVER_INFO_RESPONSE:
+		BIRIBIT_WARN("Nothing to do with ID_SERVER_INFO_RESPONSE");
+		break;
+	case ID_SERVER_STATUS_REQUEST:
+	{
+		Proto::ServerStatus proto_status;
+		for (std::size_t i = 0; i < m_clients.size(); i++)
+		{
+			if (m_clients[i] != nullptr)
+			{
+				Proto::Client* proto_client = proto_status.add_clients();
+				PopulateProtoClient(m_clients[i], proto_client);
+			}
+		}
+
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_SERVER_STATUS_RESPONSE, proto_status))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, p->systemAddress, false);
+
+		break;
 	}	
+	case ID_SERVER_STATUS_RESPONSE:
+		BIRIBIT_WARN("Nothing to do with ID_SERVER_STATUS_RESPONSE");
+		break;
+	case ID_CLIENT_UPDATE_STATUS:
+	{
+		Proto::ClientUpdate proto_update;
+		ReadMessage(proto_update, stream);
+		UpdateClient(p->systemAddress, &proto_update);
+		break;
+	}	
+	case ID_CLIENT_NAME_IN_USE:
+		BIRIBIT_WARN("Nothing to do with ID_CLIENT_NAME_IN_USE");
+		break;
+	case ID_CLIENT_STATUS_UPDATED:
+		BIRIBIT_WARN("Nothing to do with ID_SERVER_CLIENT_NAME_CHANGED");
+		break;
+	case ID_CLIENT_DISCONNECTED:
+		BIRIBIT_WARN("Nothing to do with ID_CLIENT_DISCONNECTED");
+		break;
 	default:
 		break;
 	}
@@ -322,33 +427,3 @@ bool RakNetServer::Close()
 
 	return false;
 }
-
-/*
-void RakNetServer::Send(std::uint64_t id, shared<Packet> packet)
-{
-	if (m_peer == nullptr)
-		return;
-
-	m_pool->enqueue([this, id, packet]() 
-	{
-		m_peer->Send(
-			(const char*)packet->getData(),
-			(int)packet->getDataSize(),
-			LOW_PRIORITY, RELIABLE_SEQUENCED,
-			0, RakNet::RakNetGUID(id), false);
-	});
-}
-
-void RakNetServer::AdvertiseSystem(const std::string &addr, unsigned short port, shared<Packet> packet)
-{
-	if (m_peer == nullptr)
-		return;
-
-	m_pool->enqueue([this, addr, port, packet]()
-	{
-		m_peer->AdvertiseSystem(addr.c_str(), port, 
-			(const char*)packet->getData(),
-			(int)packet->getDataSize());
-	});
-}
-*/

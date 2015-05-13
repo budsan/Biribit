@@ -1,0 +1,16 @@
+syntax = "proto2";
+option optimize_for = LITE_RUNTIME;
+
+package Proto;
+message Client
+{
+	required uint32 id = 1;
+	required string name = 2;
+	optional string appid = 3;
+}
+
+message ClientUpdate
+{
+	optional string name = 1;
+	optional string appid = 2;
+}

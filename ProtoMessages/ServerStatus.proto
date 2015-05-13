@@ -1,0 +1,12 @@
+syntax = "proto2";
+option optimize_for = LITE_RUNTIME;
+
+import "Client.proto";
+import "Room.proto";
+
+package Proto;
+message ServerStatus
+{
+	repeated Client clients = 1;
+	repeated Room rooms = 2;
+}

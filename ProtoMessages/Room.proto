@@ -1,0 +1,11 @@
+syntax = "proto2";
+option optimize_for = LITE_RUNTIME;
+
+package Proto;
+message Room
+{
+	required uint32 id = 1;
+	required uint32 maxclients = 2;
+	required string appid = 3;
+	repeated uint32 joined_id_client = 4;
+}

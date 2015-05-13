@@ -19,12 +19,13 @@
 
 #include <BiribitMessageIdentifiers.h>
 
+#include "debug.h"
 #include "RefSwap.h"
 #include "TaskPool.h"
 #include <Types.h>
 #include <Generic.h>
 
-ServerDescription::ServerDescription()
+ServerInfo::ServerInfo()
 	: name()
 	, addr(RakNet::UNASSIGNED_SYSTEM_ADDRESS.ToString(false))
 	, ping(0)
@@ -41,16 +42,16 @@ ServerConnection::ServerConnection() : id(ServerConnection::UNASSIGNED_ID)
 
 //---------------------------------------------------------------------------//
 
-struct ServerDescriptionPriv
+struct ServerInfoPriv
 {
-	ServerDescription data;
+	ServerInfo data;
 	ServerConnection::id_t id;
 	bool valid;
 
-	ServerDescriptionPriv();
+	ServerInfoPriv();
 };
 
-ServerDescriptionPriv::ServerDescriptionPriv()
+ServerInfoPriv::ServerInfoPriv()
 	: id(ServerConnection::UNASSIGNED_ID)
 	, valid(false)
 {
@@ -120,7 +121,7 @@ public:
 	void DiscoverOnLan(unsigned short port);
 	void ClearDiscoverInfo();
 	void RefreshDiscoverInfo();
-	const std::vector<ServerDescription>& GetDiscoverInfo();
+	const std::vector<ServerInfo>& GetDiscoverInfo();
 	const std::vector<ServerConnection>& GetConnections();
 
 private: 
@@ -134,15 +135,15 @@ private:
 	void RakNetUpdated();
 	void HandlePacket(RakNet::Packet*);
 
-	void ConnectedAt(RakNet::Packet*);
-	void DisconnectFrom(RakNet::Packet*);
+	void ConnectedAt(RakNet::SystemAddress);
+	void DisconnectFrom(RakNet::SystemAddress);
 
-	void Rcv_ServerInfoResponse(ServerDescriptionPriv&, ServerInfo&);
+	void PopulateServerInfo(ServerInfoPriv&, Proto::ServerInfo*);
 
 	Generic::TempBuffer m_buffer;
 
-	std::map<RakNet::SystemAddress, ServerDescriptionPriv> serverList;
-	RefSwap<std::vector<ServerDescription>> serverListReq;
+	std::map<RakNet::SystemAddress, ServerInfoPriv> serverList;
+	RefSwap<std::vector<ServerInfo>> serverListReq;
 	bool serverListReqReady;
 
 	std::vector<ServerConnectionPriv> m_connections;
@@ -263,7 +264,7 @@ void BiribitClientImpl::RefreshDiscoverInfo()
 	{
 		for (auto it = serverList.begin(); it != serverList.end(); it++)
 		{
-			ServerDescriptionPriv& info = it->second;
+			ServerInfoPriv& info = it->second;
 			m_peer->Ping(it->first.ToString(false), it->first.GetPort(), false);
 			it->second.valid = false;
 		}
@@ -285,14 +286,14 @@ void BiribitClientImpl::ClearDiscoverInfo()
 	});
 }
 
-const std::vector<ServerDescription>& BiribitClientImpl::GetDiscoverInfo()
+const std::vector<ServerInfo>& BiribitClientImpl::GetDiscoverInfo()
 {
 	if (serverListReqReady)
 	{
 		serverListReqReady = false;
 		m_pool->enqueue([this]()
 		{
-			std::vector<ServerDescription>& back = serverListReq.back();
+			std::vector<ServerInfo>& back = serverListReq.back();
 			back.clear();
 
 			for (auto it = serverList.begin(); it != serverList.end(); it++)
@@ -380,7 +381,7 @@ void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	switch (packetIdentifier)
 	{
 	case ID_DISCONNECTION_NOTIFICATION:
-		DisconnectFrom(pPacket);
+		DisconnectFrom(pPacket->systemAddress);
 		break;
 	case ID_ALREADY_CONNECTED:
 		printLog("ALREADY CONNECTED");
@@ -392,11 +393,11 @@ void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		packet >> packetIdentifier;
 		if (ID_SERVER_INFO_RESPONSE)
 		{
-			ServerInfo msg_si;
-			if (ReadMessage(msg_si, packet))
+			Proto::ServerInfo proto_info;
+			if (ReadMessage(proto_info, packet))
 			{
-				ServerDescriptionPriv& sd = serverList[pPacket->systemAddress];
-				Rcv_ServerInfoResponse(sd, msg_si);
+				ServerInfoPriv& si = serverList[pPacket->systemAddress];
+				PopulateServerInfo(si, &proto_info);
 			}
 		}
 		break;
@@ -411,8 +412,8 @@ void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			pingTime = temp;
 		}
 
-		ServerDescriptionPriv& sd = serverList[pPacket->systemAddress];
-		sd.data.ping = current - pingTime;
+		ServerInfoPriv& si = serverList[pPacket->systemAddress];
+		si.data.ping = current - pingTime;
 		
 		Packet tosend;
 		tosend << (RakNet::MessageID) ID_SERVER_INFO_REQUEST;
@@ -426,18 +427,18 @@ void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	}
 	case ID_REMOTE_DISCONNECTION_NOTIFICATION:
 		printLog("ID_REMOTE_DISCONNECTION_NOTIFICATION");
-		DisconnectFrom(pPacket);
+		DisconnectFrom(pPacket->systemAddress);
 		break;
 	case ID_REMOTE_CONNECTION_LOST:
 		printLog("ID_REMOTE_CONNECTION_LOST");
-		DisconnectFrom(pPacket);
+		DisconnectFrom(pPacket->systemAddress);
 		break;
 	case ID_REMOTE_NEW_INCOMING_CONNECTION:
 		printLog("ID_REMOTE_NEW_INCOMING_CONNECTION");
 		break;
 	case ID_CONNECTION_BANNED:
 		printLog("Banned from server.");
-		DisconnectFrom(pPacket);
+		DisconnectFrom(pPacket->systemAddress);
 		break;
 	case ID_CONNECTION_ATTEMPT_FAILED:
 		printLog("Connection attempt failed");
@@ -450,25 +451,44 @@ void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		break;
 	case ID_CONNECTION_LOST:
 		printLog("Lost connection form server.");
-		DisconnectFrom(pPacket);
+		DisconnectFrom(pPacket->systemAddress);
 		break;
 	case ID_CONNECTION_REQUEST_ACCEPTED:
-		ConnectedAt(pPacket);
+		ConnectedAt(pPacket->systemAddress);
+		break;
+	case ID_SERVER_INFO_REQUEST:
+		BIRIBIT_WARN("Nothing to do with ID_SERVER_INFO_REQUEST");
 		break;
 	case ID_SERVER_INFO_RESPONSE:
+	{
+		Proto::ServerInfo proto_info;
+		if (ReadMessage(proto_info, packet))
 		{
-			ServerInfo msg_si;
-			if (ReadMessage(msg_si, packet))
+			ServerInfoPriv& si = serverList[pPacket->systemAddress];
+			PopulateServerInfo(si, &proto_info);
+			if (si.id != ServerConnection::UNASSIGNED_ID)
 			{
-				ServerDescriptionPriv& sd = serverList[pPacket->systemAddress];
-				Rcv_ServerInfoResponse(sd, msg_si);
-				if (sd.id != ServerConnection::UNASSIGNED_ID)
-				{
-					ServerConnectionPriv& sc = m_connections[sd.id];
-					sc.data.name = msg_si.name();
-				}
+				ServerConnectionPriv& sc = m_connections[si.id];
+				sc.data.name = proto_info.name();
 			}
 		}
+
+		break;
+	}
+	case ID_SERVER_STATUS_RESPONSE:
+		//TODO
+		break;
+	case ID_CLIENT_UPDATE_STATUS:
+		BIRIBIT_WARN("Nothing to do with ID_SERVER_STATUS_RESPONSE");
+		break;
+	case ID_CLIENT_NAME_IN_USE:
+		//TODO
+		break;
+	case ID_CLIENT_STATUS_UPDATED:
+		//TODO
+		break;
+	case ID_CLIENT_DISCONNECTED:
+		//TODO
 		break;
 	default:
 		printLog("UNKNOWN PACKET IDENTIFIER");
@@ -476,7 +496,7 @@ void BiribitClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	}
 }
 
-void BiribitClientImpl::ConnectedAt(RakNet::Packet* pPacket)
+void BiribitClientImpl::ConnectedAt(RakNet::SystemAddress addr)
 {
 	//Looking for room in m_connections vector
 	std::size_t i = 1;
@@ -485,7 +505,7 @@ void BiribitClientImpl::ConnectedAt(RakNet::Packet* pPacket)
 		if (m_connections[i].isNull())
 		{
 			ServerConnectionPriv& sc = m_connections[i];
-			sc.addr = pPacket->systemAddress;
+			sc.addr = addr;
 			sc.data.id = i;
 			break;
 		}
@@ -494,43 +514,43 @@ void BiribitClientImpl::ConnectedAt(RakNet::Packet* pPacket)
 	if (i == m_connections.size())
 	{
 		ServerConnectionPriv sc;
-		sc.addr = pPacket->systemAddress;
+		sc.addr = addr;
 		sc.data.id = i;
 		m_connections.push_back(sc);
 	}
 
-	ServerDescriptionPriv& sd = serverList[pPacket->systemAddress];
-	sd.id = i;
+	ServerInfoPriv& si = serverList[addr];
+	si.id = i;
 
 	Packet tosend;
 	tosend << (RakNet::MessageID) ID_SERVER_INFO_REQUEST;
 	m_peer->Send((const char*)tosend.getData(),
 		(int)tosend.getDataSize(),
 		LOW_PRIORITY, RELIABLE_SEQUENCED,
-		0, pPacket->systemAddress, false);
+		0, addr, false);
 
 	GetConnections();
 }
 
-void BiribitClientImpl::DisconnectFrom(RakNet::Packet* pPacket)
+void BiribitClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 {
-	ServerDescriptionPriv& sd = serverList[pPacket->systemAddress];
-	if (sd.id != ServerConnection::UNASSIGNED_ID)
+	ServerInfoPriv& si = serverList[addr];
+	if (si.id != ServerConnection::UNASSIGNED_ID)
 	{
-		ServerConnectionPriv& sc = m_connections[sd.id];
-		if (sd.valid)
+		ServerConnectionPriv& sc = m_connections[si.id];
+		if (si.valid)
 			printLog("Disconnected from %s.", sc.data.name.c_str());
 
 		sc.addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
-		sd.id = ServerConnection::UNASSIGNED_ID;
+		si.id = ServerConnection::UNASSIGNED_ID;
 	}
 }
 
-void BiribitClientImpl::Rcv_ServerInfoResponse(ServerDescriptionPriv& sd, ServerInfo& msg_si)
+void BiribitClientImpl::PopulateServerInfo(ServerInfoPriv& si, Proto::ServerInfo* proto_info)
 {
-	sd.data.name = msg_si.name();
-	sd.valid = true;
-	sd.data.passwordProtected = msg_si.password_protected();
+	si.data.name = proto_info->name();
+	si.valid = true;
+	si.data.passwordProtected = proto_info->password_protected();
 }
 
 //---------------------------------------------------------------------------//
@@ -575,7 +595,7 @@ void BiribitClient::RefreshDiscoverInfo()
 	m_impl->RefreshDiscoverInfo();
 }
 
-const std::vector<ServerDescription>& BiribitClient::GetDiscoverInfo()
+const std::vector<ServerInfo>& BiribitClient::GetDiscoverInfo()
 {
 	return m_impl->GetDiscoverInfo();
 }

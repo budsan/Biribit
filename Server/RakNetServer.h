@@ -19,14 +19,9 @@ class RakNetServer
 	std::string m_name;
 	bool m_passwordProtected;
 
-	struct Client
+	struct Client : public Biribit::Client
 	{
-		typedef std::size_t id_t;
-		enum { UNASSIGNED_ID = 0 };
-
-		std::size_t id;
 		RakNet::SystemAddress addr;
-		std::string name;
 	};
 
 	std::vector<unique<Client>> m_clients;
@@ -35,8 +30,10 @@ class RakNetServer
 
 	Client::id_t NewClient(RakNet::SystemAddress addr);
 	void RemoveClient(RakNet::SystemAddress addr);
-	void SetClientName(RakNet::SystemAddress addr, const std::string& name);
+	void UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate* proto_update);
 
+	void PopulateProtoServerInfo(Proto::ServerInfo* proto_info);
+	void PopulateProtoClient(unique<Client>& client, Proto::Client* proto_client);
 
 	unique<TaskPool> m_pool;
 	Generic::TempBuffer m_buffer;
@@ -45,10 +42,7 @@ class RakNetServer
 	void RakNetUpdated();
 	void HandlePacket(RakNet::Packet*);
 
-	bool WriteMessage(RakNet::BitStream& bstream,
-		RakNet::MessageID msgId,
-		::google::protobuf::MessageLite& msg);
-
+	bool WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, ::google::protobuf::MessageLite& msg);
 	template<typename T> bool ReadMessage(T& msg, RakNet::BitStream& bstream);
 
 public:

@@ -6,7 +6,7 @@
 
 #include "Config.h"
 
-struct API_EXPORT ServerDescription
+struct API_EXPORT ServerInfo
 {
 		std::string name;
 		std::string addr;
@@ -14,7 +14,7 @@ struct API_EXPORT ServerDescription
 		unsigned short port;
 		bool passwordProtected;
 
-		ServerDescription();
+		ServerInfo();
 };
 
 struct API_EXPORT ServerConnection
@@ -43,7 +43,8 @@ public:
 	void DiscoverOnLan(unsigned short port = 0);
 	void ClearDiscoverInfo();
 	void RefreshDiscoverInfo();
-	const std::vector<ServerDescription>& GetDiscoverInfo();
+
+	const std::vector<ServerInfo>& GetDiscoverInfo();
 	const std::vector<ServerConnection>& GetConnections();
 
 private:
