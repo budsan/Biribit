@@ -33,7 +33,7 @@ class RakNetServer
 	std::map<RakNet::SystemAddress, std::size_t> m_clientAddrMap;
 	std::map<std::string, std::size_t> m_clientNameMap;
 
-	void NewClient(RakNet::SystemAddress addr);
+	Client::id_t NewClient(RakNet::SystemAddress addr);
 	void RemoveClient(RakNet::SystemAddress addr);
 	void SetClientName(RakNet::SystemAddress addr, const std::string& name);
 

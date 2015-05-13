@@ -48,7 +48,7 @@ RakNetServer::RakNetServer()
 
 }
 
-void RakNetServer::NewClient(RakNet::SystemAddress addr)
+RakNetServer::Client::id_t RakNetServer::NewClient(RakNet::SystemAddress addr)
 {
 	BIRIBIT_ASSERT(m_clientAddrMap.find(addr) == m_clientAddrMap.end());
 
@@ -62,6 +62,7 @@ void RakNetServer::NewClient(RakNet::SystemAddress addr)
 
 	m_clients[i]->addr = addr;
 	m_clientAddrMap[addr] = i;
+	return i;
 }
 
 void RakNetServer::RemoveClient(RakNet::SystemAddress addr)
@@ -146,8 +147,11 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		RemoveClient(p->systemAddress);
 		break;
 	case ID_NEW_INCOMING_CONNECTION:
-		printLog("New client connected from %s.", p->systemAddress.ToString());
-		NewClient(p->systemAddress);
+		{
+			Client::id_t id = NewClient(p->systemAddress);
+			SetClientName(p->systemAddress, "guest" + std::to_string(id));
+			printLog("New client connected from %s. Id(%d) name(%s).", p->systemAddress.ToString(), id, m_clients[id]->name);
+		}
 		break;
 	case ID_INCOMPATIBLE_PROTOCOL_VERSION:
 		stream.Read(packetIdentifier);
