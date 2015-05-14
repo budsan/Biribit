@@ -14,6 +14,8 @@
 #include "imgui.h"
 #endif
 
+template<int N> int sizeof_array(const char (&s)[N]) { return N; }
+
 namespace Client
 {
 
@@ -40,6 +42,16 @@ class ClientUpdater : public UpdaterListener
 			ImGui::End();
 			return;
 		}
+
+		static char addr[128] = "localhost";
+		static char pass[128] = "";
+		static int port = 0;
+
+		ImGui::InputText("Address", addr, sizeof_array(addr));
+		ImGui::InputInt("Port", &port); 
+		ImGui::InputText("Password", pass, sizeof_array(pass)); ImGui::SameLine();
+		if (ImGui::Button("Connect"))
+			client->Connect(addr, port, (pass[0] != '\0') ? pass : nullptr);
 
 		if (ImGui::Button("Discover in LAN"))
 			client->DiscoverOnLan();
@@ -69,7 +81,7 @@ class ClientUpdater : public UpdaterListener
 
 			ImGui::ListBox("Servers", &server_listbox_current, &server_listbox[0], server_listbox.size(), 4);
 
-			if (ImGui::Button("Connect"))
+			if (ImGui::Button("Connect selected"))
 			{
 				const Biribit::ServerInfo& serverInfo = info[server_listbox_current];
 				client->Connect(serverInfo.addr.c_str(), serverInfo.port);
@@ -93,6 +105,22 @@ class ClientUpdater : public UpdaterListener
 				connections_listbox_current = 0;
 
 			ImGui::ListBox("Connections", &connections_listbox_current, &connections_listbox[0], connections_listbox.size(), 4);
+			if (ImGui::Button("Disconnect selected"))
+			{
+				const Biribit::ServerConnection& connection = conns[connections_listbox_current];
+				client->Disconnect(connection.id);
+			}
+
+			if (ImGui::Button("Disconnect all"))
+				client->Disconnect();
+
+			static char cname[128] = "ClientName";
+			static char appid[128] = "app-client-test";
+
+			ImGui::InputText("Client name", cname, sizeof_array(cname));
+			ImGui::InputText("Application Id", appid, sizeof_array(appid));
+			if (ImGui::Button("Set on selected connection"))
+				client->SetLocalClientParameters(conns[connections_listbox_current].id, Biribit::ClientParameters(cname, appid));
 
 			ImGui::LabelText("##ClientsLabel", "Connected clients");
 			ImGui::Separator();
@@ -104,16 +132,6 @@ class ClientUpdater : public UpdaterListener
 				ImGui::TextUnformatted(item.c_str());
 			}
 			ImGui::PopStyleVar();
-			ImGui::Separator();
-
-			if (ImGui::Button("Disconnect"))
-			{
-				const Biribit::ServerConnection& connection = conns[connections_listbox_current];
-				client->Disconnect(connection.id);
-			}
-
-			if (ImGui::Button("Disconnect all"))
-				client->Disconnect();
 		}
 
 		ImGui::PopStyleVar();

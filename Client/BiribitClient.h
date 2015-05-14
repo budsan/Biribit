@@ -44,6 +44,15 @@ struct API_EXPORT RemoteClient
 	RemoteClient();
 };
 
+struct API_EXPORT ClientParameters
+{
+	std::string name;
+	std::string appid;
+
+	ClientParameters();
+	ClientParameters(const std::string& name, const std::string& appid);
+};
+
 class ClientImpl;
 class API_EXPORT Client
 {
@@ -63,7 +72,9 @@ public:
 	const std::vector<ServerInfo>& GetDiscoverInfo();
 	const std::vector<ServerConnection>& GetConnections();
 	const std::vector<RemoteClient>& GetRemoteClients(ServerConnection::id_t id);
-	const RemoteClient::id_t GetLocalClientId(ServerConnection::id_t id);
+
+	RemoteClient::id_t GetLocalClientId(ServerConnection::id_t id);
+	void SetLocalClientParameters(ServerConnection::id_t id, const ClientParameters& parameters);
 
 private:
 	ClientImpl* m_impl;

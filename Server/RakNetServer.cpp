@@ -148,15 +148,17 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 		}
 		else
 		{
+			printLog("Client(%d) \"%s\" changed name to \"%s\".", itAddr->second, m_clients[itAddr->second]->name.c_str(), name.c_str());
 			m_clientNameMap[name] = itAddr->second;
 			m_clients[itAddr->second]->name = name;
 			updated = true;
 		}
 	}
 
-	if (proto_update->has_appid())
+	if (proto_update->has_appid() && m_clients[itAddr->second]->appid != proto_update->appid())
 	{
 		m_clients[itAddr->second]->appid = proto_update->appid();
+		printLog("Client(%d) \"%s\" changed appid to \"%s\".", itAddr->second, m_clients[itAddr->second]->name.c_str(), proto_update->appid().c_str());
 		updated = true;
 	}
 
@@ -222,7 +224,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 	case ID_NEW_INCOMING_CONNECTION:
 		{
 			Client::id_t id = NewClient(p->systemAddress);
-			printLog("New client \"%s\"\(%d\) connected from %s.", m_clients[id]->name.c_str(), id, p->systemAddress.ToString());
+			printLog("New client(%d) \"%s\" connected from %s.", id, m_clients[id]->name.c_str(), p->systemAddress.ToString());
 		}
 		break;
 	case ID_INCOMPATIBLE_PROTOCOL_VERSION:

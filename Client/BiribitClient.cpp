@@ -36,17 +36,24 @@ ServerInfo::ServerInfo()
 	, port(0)
 	, passwordProtected(false)
 {
-
 }
 
 ServerConnection::ServerConnection() : id(ServerConnection::UNASSIGNED_ID)
 {
-
 }
 
 RemoteClient::RemoteClient() : id(RemoteClient::UNASSIGNED_ID)
 {
+}
 
+ClientParameters::ClientParameters()
+{
+}
+
+ClientParameters::ClientParameters(const std::string& name, const std::string& appid)
+	: name(name)
+	, appid(appid)
+{
 }
 
 //---------------------------------------------------------------------------//
@@ -74,7 +81,9 @@ public:
 	ServerConnection data;
 	RakNet::SystemAddress addr;
 
+	ClientParameters requested;
 	RemoteClient::id_t selfId;
+
 	std::vector<RemoteClient> clients;
 	RefSwap<std::vector<RemoteClient>> clientsListReq;
 
@@ -135,7 +144,9 @@ public:
 	const std::vector<ServerInfo>& GetDiscoverInfo();
 	const std::vector<ServerConnection>& GetConnections();
 	const std::vector<RemoteClient>& GetRemoteClients(ServerConnection::id_t id);
-	const RemoteClient::id_t GetLocalClientId(ServerConnection::id_t id);
+
+	RemoteClient::id_t GetLocalClientId(ServerConnection::id_t id);
+	void SetLocalClientParameters(ServerConnection::id_t id, const ClientParameters& parameters);
 
 private: 
 	RakNet::RakPeerInterface *m_peer;
@@ -342,7 +353,8 @@ const std::vector<ServerConnection>& ClientImpl::GetConnections()
 			std::vector<ServerConnection>& back = connectionsListReq.back();
 			back.clear();
 
-			for (auto it = ++m_connections.begin(); it != m_connections.end(); it++)
+			auto it = m_connections.begin(); it++;
+			for (; it != m_connections.end(); it++)
 			{
 				if (!it->isNull()) {
 					it->data.ping = m_peer->GetAveragePing(it->addr);
@@ -383,12 +395,34 @@ const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(ServerConnection::
 	return m_connections[id].clientsListReq.front();
 }
 
-const RemoteClient::id_t ClientImpl::GetLocalClientId(ServerConnection::id_t id)
+RemoteClient::id_t ClientImpl::GetLocalClientId(ServerConnection::id_t id)
 {
 	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return RemoteClient::UNASSIGNED_ID;
 
 	return m_connections[id].selfId;
+}
+
+void ClientImpl::SetLocalClientParameters(ServerConnection::id_t id, const ClientParameters& _parameters)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	ClientParameters parameters = _parameters;
+	m_pool->enqueue([this, id, parameters]()
+	{
+		bool ready = false;
+		Proto::ClientUpdate proto_update;
+		proto_update.set_name(parameters.name);
+		proto_update.set_appid(parameters.appid);
+
+		ServerConnectionPriv& conn = m_connections[id];
+		conn.requested = parameters;
+
+		RakNet::BitStream bstream;
+		WriteMessage(bstream, ID_CLIENT_UPDATE_STATUS, proto_update);
+		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, conn.addr, false);
+	});
 }
 
 void ClientImpl::SendProtocolMessageID(RakNet::MessageID msg, const RakNet::AddressOrGUID systemIdentifier)
@@ -749,9 +783,14 @@ const std::vector<RemoteClient>& Client::GetRemoteClients(ServerConnection::id_t
 	return m_impl->GetRemoteClients(id);
 }
 
-const RemoteClient::id_t Client::GetLocalClientId(ServerConnection::id_t id)
+RemoteClient::id_t Client::GetLocalClientId(ServerConnection::id_t id)
 {
 	return m_impl->GetLocalClientId(id);
+}
+
+void Client::SetLocalClientParameters(ServerConnection::id_t id, const ClientParameters& parameters)
+{
+	m_impl->SetLocalClientParameters(id, parameters);
 }
 
 }
