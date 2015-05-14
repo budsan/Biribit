@@ -57,6 +57,7 @@ RakNetServer::Client::id_t RakNetServer::NewClient(RakNet::SystemAddress addr)
 	else
 		m_clients.push_back(unique<Client>(new Client()));
 
+	m_clients[i]->id = i;
 	m_clients[i]->appid.clear();
 	m_clients[i]->addr = addr;
 	m_clientAddrMap[addr] = i;
@@ -84,9 +85,16 @@ RakNetServer::Client::id_t RakNetServer::NewClient(RakNet::SystemAddress addr)
 
 	Proto::Client proto_client;
 	PopulateProtoClient(m_clients[i], &proto_client);
-	RakNet::BitStream bstream;
-	if (WriteMessage(bstream, ID_CLIENT_STATUS_UPDATED, proto_client))
-		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+	{
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_CLIENT_STATUS_UPDATED, proto_client))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+	}
+	{
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_CLIENT_SELF_STATUS, proto_client))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
+	}
 
 	return i;
 }
@@ -255,6 +263,9 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 	case ID_SERVER_INFO_RESPONSE:
 		BIRIBIT_WARN("Nothing to do with ID_SERVER_INFO_RESPONSE");
 		break;
+	case ID_CLIENT_SELF_STATUS:
+		BIRIBIT_WARN("Nothing to do with ID_CLIENT_SELF_STATUS");
+		break;
 	case ID_SERVER_STATUS_REQUEST:
 	{
 		Proto::ServerStatus proto_status;
@@ -266,6 +277,8 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 				PopulateProtoClient(m_clients[i], proto_client);
 			}
 		}
+
+		//TODO: Add Rooms
 
 		RakNet::BitStream bstream;
 		if (WriteMessage(bstream, ID_SERVER_STATUS_RESPONSE, proto_status))
@@ -309,6 +322,8 @@ bool RakNetServer::WriteMessage(RakNet::BitStream& bstream,
 		bstream.Write(m_buffer.data, size);
 		return true;
 	}
+	else
+		BIRIBIT_WARN("%s unable to serialize.", msg.GetTypeName());
 
 	return false;
 }

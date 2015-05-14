@@ -61,11 +61,12 @@ class ClientUpdater : public UpdaterListener
 		for (auto it = server_listbox_str.begin(); it != server_listbox_str.end(); it++)
 			server_listbox.push_back(it->c_str());
 
-		static int server_listbox_current = 0;
+		static int server_listbox_current = 1;
 		if (!server_listbox.empty())
 		{
-			if (server_listbox_current > server_listbox.size())
+			if (server_listbox_current >= server_listbox.size())
 				server_listbox_current = 0;
+
 			ImGui::ListBox("Servers", &server_listbox_current, &server_listbox[0], server_listbox.size(), 4);
 
 			if (ImGui::Button("Connect"))
@@ -88,9 +89,22 @@ class ClientUpdater : public UpdaterListener
 		static int connections_listbox_current = 0;
 		if (!connections_listbox.empty())
 		{
-			if (connections_listbox_current > connections_listbox.size())
+			if (connections_listbox_current >= connections_listbox.size())
 				connections_listbox_current = 0;
+
 			ImGui::ListBox("Connections", &connections_listbox_current, &connections_listbox[0], connections_listbox.size(), 4);
+
+			ImGui::LabelText("##ClientsLabel", "Connected clients");
+			ImGui::Separator();
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1));
+			const std::vector<Biribit::RemoteClient>& clients = client->GetRemoteClients(conns[connections_listbox_current].id);
+			Biribit::RemoteClient::id_t selfId = client->GetLocalClientId(conns[connections_listbox_current].id);
+			for (auto it = clients.begin(); it != clients.end(); it++) {
+				std::string item = std::to_string(it->id) + ": " + it->name + ( (it->id == selfId) ? " (YOU)" : "");
+				ImGui::TextUnformatted(item.c_str());
+			}
+			ImGui::PopStyleVar();
+			ImGui::Separator();
 
 			if (ImGui::Button("Disconnect"))
 			{

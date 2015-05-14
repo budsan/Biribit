@@ -19,6 +19,9 @@ enum BiribitMessageIDTypes
 	ID_SERVER_INFO_RESPONSE,
 	//sv > cl: follows Proto::ServerInfo
 
+	ID_CLIENT_SELF_STATUS,
+	//sv > cl: follows Proto::Client
+
 	ID_SERVER_STATUS_REQUEST,
 	//cl > sv: nothing follows
 

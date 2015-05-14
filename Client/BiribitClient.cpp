@@ -44,6 +44,11 @@ ServerConnection::ServerConnection() : id(ServerConnection::UNASSIGNED_ID)
 
 }
 
+RemoteClient::RemoteClient() : id(RemoteClient::UNASSIGNED_ID)
+{
+
+}
+
 //---------------------------------------------------------------------------//
 
 struct ServerInfoPriv
@@ -69,13 +74,17 @@ public:
 	ServerConnection data;
 	RakNet::SystemAddress addr;
 
-	ServerConnectionPriv();
+	RemoteClient::id_t selfId;
+	std::vector<RemoteClient> clients;
+	RefSwap<std::vector<RemoteClient>> clientsListReq;
 
+	ServerConnectionPriv();
 	bool isNull();
 };
 
 ServerConnectionPriv::ServerConnectionPriv()
 	: addr(RakNet::UNASSIGNED_SYSTEM_ADDRESS)
+	, selfId(RemoteClient::UNASSIGNED_ID)
 {
 }
 
@@ -125,11 +134,14 @@ public:
 	void RefreshDiscoverInfo();
 	const std::vector<ServerInfo>& GetDiscoverInfo();
 	const std::vector<ServerConnection>& GetConnections();
+	const std::vector<RemoteClient>& GetRemoteClients(ServerConnection::id_t id);
+	const RemoteClient::id_t GetLocalClientId(ServerConnection::id_t id);
 
 private: 
 	RakNet::RakPeerInterface *m_peer;
 	unique<TaskPool> m_pool;
 
+	void SendProtocolMessageID(RakNet::MessageID msg, const RakNet::AddressOrGUID systemIdentifier);
 	bool WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, ::google::protobuf::MessageLite& msg);
 	template<typename T> bool ReadMessage(T& msg, Packet& packet);
 
@@ -140,7 +152,11 @@ private:
 	void ConnectedAt(RakNet::SystemAddress);
 	void DisconnectFrom(RakNet::SystemAddress);
 
-	void PopulateServerInfo(ServerInfoPriv&, Proto::ServerInfo*);
+	enum TypeUpdateRemoteClient {UPDATE_REMOTE_CLIENT, UPDATE_SELF_CLIENT, UPDATE_REMOTE_DISCONNECTION};
+	void UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type);
+
+	static void PopulateServerInfo(ServerInfoPriv&, const Proto::ServerInfo*);
+	static void PopulateRemoteClient(RemoteClient&, const Proto::Client*);
 
 	Generic::TempBuffer m_buffer;
 	
@@ -150,8 +166,6 @@ private:
 	std::array<ServerConnectionPriv, CLIENT_MAX_CONNECTIONS+1> m_connections;
 	RefSwap<std::vector<ServerConnection>> connectionsListReq;
 	RakNet::TimeMS m_lastDirtyDueTime;
-
-	//std::array<RefSwap<std::vector<RemoteClient>>, CLIENT_MAX_CONNECTIONS+1> m_remoteClientsReq;
 };
 
 ClientImpl::ClientImpl()
@@ -269,7 +283,7 @@ void ClientImpl::RefreshDiscoverInfo()
 {
 	m_pool->enqueue([this]()
 	{
-		for (auto it = ++serverList.begin(); it != serverList.end(); it++)
+		for (auto it = serverList.begin(); it != serverList.end(); it++)
 		{
 			ServerInfoPriv& info = it->second;
 			m_peer->Ping(it->first.ToString(false), it->first.GetPort(), false);
@@ -342,6 +356,45 @@ const std::vector<ServerConnection>& ClientImpl::GetConnections()
 	}
 
 	return connectionsListReq.front();
+}
+
+const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(ServerConnection::id_t id)
+{
+	static std::vector<RemoteClient> empty;
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return empty;
+		
+	if (m_connections[id].clientsListReq.request())
+	{
+		m_pool->enqueue([this, id]()
+		{
+			ServerConnectionPriv& sc = m_connections[id];
+			std::vector<RemoteClient>& back = sc.clientsListReq.back();
+			back.clear();
+
+			for (auto it = sc.clients.begin(); it != sc.clients.end(); it++)
+				if (it->id != RemoteClient::UNASSIGNED_ID)
+					back.push_back(*it);
+
+			sc.clientsListReq.swap();
+		});
+	}
+
+	return m_connections[id].clientsListReq.front();
+}
+
+const RemoteClient::id_t ClientImpl::GetLocalClientId(ServerConnection::id_t id)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return RemoteClient::UNASSIGNED_ID;
+
+	return m_connections[id].selfId;
+}
+
+void ClientImpl::SendProtocolMessageID(RakNet::MessageID msg, const RakNet::AddressOrGUID systemIdentifier)
+{
+	Packet tosend; tosend << msg;
+	m_peer->Send((const char*)tosend.getData(), (int)tosend.getDataSize(), LOW_PRIORITY, RELIABLE, 0, systemIdentifier, false);
 }
 
 bool ClientImpl::WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, ::google::protobuf::MessageLite& msg)
@@ -484,9 +537,44 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 
 		break;
 	}
-	case ID_SERVER_STATUS_RESPONSE:
-		//TODO
+	case ID_CLIENT_SELF_STATUS:
+	{
+		Proto::Client proto_client;
+		if (ReadMessage(proto_client, packet))
+			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_SELF_CLIENT);
 		break;
+	}
+	case ID_SERVER_STATUS_REQUEST:
+		BIRIBIT_WARN("Nothing to do with ID_SERVER_STATUS_REQUEST");
+		break;
+	case ID_SERVER_STATUS_RESPONSE:
+	{
+		Proto::ServerStatus proto_status;
+		if (ReadMessage(proto_status, packet))
+		{
+			ServerInfoPriv& si = serverList[pPacket->systemAddress];
+			BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
+			ServerConnectionPriv& sc = m_connections[si.id];
+
+			std::uint32_t max = 0;
+			int clients_size = proto_status.clients_size();
+			for (int i = 0; i < clients_size; i++)
+				if (proto_status.clients(i).has_id())
+					max = std::max(proto_status.clients(i).id(), max);
+
+			sc.clients.resize(max + 1);
+			for (int i = 0; i < clients_size; i++) {
+				const Proto::Client& proto_client = proto_status.clients(i);
+				if (proto_client.has_id())
+					PopulateRemoteClient(sc.clients[proto_client.id()], &proto_client);
+			}
+
+			sc.clientsListReq.set_dirty();
+
+			//TODO: ROOMS
+		}
+		break;
+	}
 	case ID_CLIENT_UPDATE_STATUS:
 		BIRIBIT_WARN("Nothing to do with ID_SERVER_STATUS_RESPONSE");
 		break;
@@ -494,11 +582,19 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		//TODO
 		break;
 	case ID_CLIENT_STATUS_UPDATED:
-		//TODO
+	{
+		Proto::Client proto_client;
+		if (ReadMessage(proto_client, packet))
+			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_REMOTE_CLIENT);
 		break;
+	}
 	case ID_CLIENT_DISCONNECTED:
-		//TODO
+	{
+		Proto::Client proto_client;
+		if (ReadMessage(proto_client, packet))
+			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_REMOTE_DISCONNECTION);
 		break;
+	}
 	default:
 		printLog("UNKNOWN PACKET IDENTIFIER");
 		break;
@@ -526,13 +622,8 @@ void ClientImpl::ConnectedAt(RakNet::SystemAddress addr)
 	ServerInfoPriv& si = serverList[addr];
 	si.id = i;
 
-	Packet tosend;
-	tosend << (RakNet::MessageID) ID_SERVER_INFO_REQUEST;
-	m_peer->Send((const char*)tosend.getData(),
-		(int)tosend.getDataSize(),
-		LOW_PRIORITY, RELIABLE_SEQUENCED,
-		0, addr, false);
-
+	SendProtocolMessageID(ID_SERVER_INFO_REQUEST, addr);
+	SendProtocolMessageID(ID_SERVER_STATUS_REQUEST, addr);
 	connectionsListReq.set_dirty();
 }
 
@@ -551,18 +642,61 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 	}
 }
 
-void ClientImpl::PopulateServerInfo(ServerInfoPriv& si, Proto::ServerInfo* proto_info)
+void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type)
 {
-	si.data.name = proto_info->name();
-	si.valid = true;
-	si.data.passwordProtected = proto_info->password_protected();
+	ServerInfoPriv& si = serverList[addr];
+	BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
+	ServerConnectionPriv& sc = m_connections[si.id];
+	if (proto_client->has_id())
+	{
+		std::uint32_t id = proto_client->id();
+		if (id >= sc.clients.size())
+			sc.clients.resize(id + 1);
+
+		switch (type)
+		{
+		case UPDATE_SELF_CLIENT:
+			sc.selfId = id;
+		case UPDATE_REMOTE_CLIENT:
+			PopulateRemoteClient(sc.clients[id], proto_client);
+			break;
+		case UPDATE_REMOTE_DISCONNECTION:
+			sc.clients[id].id = RemoteClient::UNASSIGNED_ID;
+			sc.selfId = sc.selfId == id ? RemoteClient::UNASSIGNED_ID : sc.selfId;
+			break;
+		}
+
+		sc.clientsListReq.set_dirty();
+	}
+}
+
+void ClientImpl::PopulateServerInfo(ServerInfoPriv& si, const Proto::ServerInfo* proto_info)
+{
+	if (proto_info->has_name()){
+		si.data.name = proto_info->name();
+		si.valid = true;
+	}
+		
+	if (proto_info->has_password_protected())
+		si.data.passwordProtected = proto_info->password_protected();
+}
+
+void ClientImpl::PopulateRemoteClient(RemoteClient& remote, const Proto::Client* proto_client)
+{
+	if (proto_client->has_id())
+		remote.id = proto_client->id();
+
+	if (proto_client->has_name())
+		remote.name = proto_client->name();
+
+	if (proto_client->has_appid())
+		remote.appid = proto_client->appid();
 }
 
 //---------------------------------------------------------------------------//
 
 Client::Client() : m_impl(new ClientImpl())
 {
-
 }
 
 Client::~Client()
@@ -608,6 +742,16 @@ const std::vector<ServerInfo>& Client::GetDiscoverInfo()
 const std::vector<ServerConnection>& Client::GetConnections()
 {
 	return m_impl->GetConnections();
+}
+
+const std::vector<RemoteClient>& Client::GetRemoteClients(ServerConnection::id_t id)
+{
+	return m_impl->GetRemoteClients(id);
+}
+
+const RemoteClient::id_t Client::GetLocalClientId(ServerConnection::id_t id)
+{
+	return m_impl->GetLocalClientId(id);
 }
 
 }
