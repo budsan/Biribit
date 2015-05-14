@@ -6,15 +6,18 @@
 
 #include "Config.h"
 
+namespace Biribit
+{
+
 struct API_EXPORT ServerInfo
 {
-		std::string name;
-		std::string addr;
-		std::uint32_t ping;
-		unsigned short port;
-		bool passwordProtected;
+	std::string name;
+	std::string addr;
+	std::uint32_t ping;
+	unsigned short port;
+	bool passwordProtected;
 
-		ServerInfo();
+	ServerInfo();
 };
 
 struct API_EXPORT ServerConnection
@@ -24,17 +27,28 @@ struct API_EXPORT ServerConnection
 
 	id_t id;
 	std::string name;
+	std::uint32_t ping;
 
 	ServerConnection();
 };
 
-class BiribitClientImpl;
-class API_EXPORT BiribitClient
+struct API_EXPORT RemoteClient
+{
+	typedef std::size_t id_t;
+	enum { UNASSIGNED_ID = 0 };
+
+	id_t id;
+	std::string name;
+	std::string appid;
+};
+
+class ClientImpl;
+class API_EXPORT Client
 {
 public:
 
-	BiribitClient();
-	virtual ~BiribitClient();
+	Client();
+	virtual ~Client();
 
 	void Connect(const char* addr = nullptr, unsigned short port = 0, const char* password = nullptr);
 	void Disconnect(ServerConnection::id_t id);
@@ -48,5 +62,7 @@ public:
 	const std::vector<ServerConnection>& GetConnections();
 
 private:
-	BiribitClientImpl* m_impl;
+	ClientImpl* m_impl;
 };
+
+}

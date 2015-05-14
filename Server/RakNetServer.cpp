@@ -38,9 +38,6 @@ const char* randomNames[] = {
 
 template<int N> int sizeof_string_array(const char* (&s)[N]) { return N; }
 
-const unsigned short SERVER_DEFAULT_PORT = 8287;
-const unsigned short SERVER_MAX_NUM_CLIENTS = 42;
-
 RakNetServer::RakNetServer()
 	: m_peer(nullptr)
 	, m_clients(1)
@@ -217,7 +214,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 	case ID_NEW_INCOMING_CONNECTION:
 		{
 			Client::id_t id = NewClient(p->systemAddress);
-			printLog("New client connected from %s. Id(%d) name(%s).", p->systemAddress.ToString(), id, m_clients[id]->name.c_str());
+			printLog("New client \"%s\"\(%d\) connected from %s.", m_clients[id]->name.c_str(), id, p->systemAddress.ToString());
 		}
 		break;
 	case ID_INCOMPATIBLE_PROTOCOL_VERSION:

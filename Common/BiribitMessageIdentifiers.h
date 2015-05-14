@@ -7,6 +7,10 @@
 
 #include "MessageIdentifiers.h"
 
+const unsigned short SERVER_DEFAULT_PORT = 8287;
+const unsigned int   SERVER_MAX_NUM_CLIENTS = 42;
+const unsigned int   CLIENT_MAX_CONNECTIONS = 8;
+
 enum BiribitMessageIDTypes
 {
 	ID_SERVER_INFO_REQUEST = ID_USER_PACKET_ENUM,
@@ -33,16 +37,3 @@ enum BiribitMessageIDTypes
 	ID_CLIENT_DISCONNECTED
 	//sv > cl: follows Proto::Client
 };
-
-namespace Biribit
-{
-	struct Client
-	{
-		typedef std::size_t id_t;
-		enum { UNASSIGNED_ID = 0 };
-
-		std::size_t id;
-		std::string name;
-		std::string appid;
-	};
-}

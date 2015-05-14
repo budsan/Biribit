@@ -19,8 +19,14 @@ class RakNetServer
 	std::string m_name;
 	bool m_passwordProtected;
 
-	struct Client : public Biribit::Client
+	struct Client
 	{
+		typedef std::size_t id_t;
+		enum { UNASSIGNED_ID = 0 };
+
+		id_t id;
+		std::string name;
+		std::string appid;
 		RakNet::SystemAddress addr;
 	};
 

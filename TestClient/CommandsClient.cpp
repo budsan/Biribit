@@ -19,7 +19,7 @@ namespace Client
 
 class ClientUpdater : public UpdaterListener
 {
-	shared<BiribitClient> client;
+	shared<Biribit::Client> client;
 	Console* console;
 	bool displayed;
 
@@ -53,13 +53,13 @@ class ClientUpdater : public UpdaterListener
 		ImGui::PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 5.0f);	
 		std::vector<const char*> server_listbox;
 		std::vector<std::string> server_listbox_str;
-		const std::vector<ServerInfo>& info = client->GetDiscoverInfo();
+		const std::vector<Biribit::ServerInfo>& info = client->GetDiscoverInfo();
+
 		for (auto it = info.begin(); it != info.end(); it++)
-		{
-			const ServerInfo& serverInfo = *it;
 			server_listbox_str.push_back(it->name + ", ping " + std::to_string(it->ping) + (it->passwordProtected ? ". Password protected." : ". No password."));
-			server_listbox.push_back(server_listbox_str.back().c_str());
-		}
+			
+		for (auto it = server_listbox_str.begin(); it != server_listbox_str.end(); it++)
+			server_listbox.push_back(it->c_str());
 
 		static int server_listbox_current = 0;
 		if (!server_listbox.empty())
@@ -70,20 +70,20 @@ class ClientUpdater : public UpdaterListener
 
 			if (ImGui::Button("Connect"))
 			{
-				const ServerInfo& serverInfo = info[server_listbox_current];
+				const Biribit::ServerInfo& serverInfo = info[server_listbox_current];
 				client->Connect(serverInfo.addr.c_str(), serverInfo.port);
 			}
 		}
 
 		std::vector<const char*> connections_listbox;
 		std::vector<std::string> connections_listbox_str;
-		const std::vector<ServerConnection>& conns = client->GetConnections();
+		const std::vector<Biribit::ServerConnection>& conns = client->GetConnections();
+
 		for (auto it = conns.begin(); it != conns.end(); it++)
-		{
-			const ServerConnection& connection = *it;
-			connections_listbox_str.push_back(std::to_string(it->id) + ": " + it->name);
-			connections_listbox.push_back(connections_listbox_str.back().c_str());
-		}
+			connections_listbox_str.push_back(std::to_string(it->id) + ": " + it->name + ". Ping: " + std::to_string(it->ping));
+
+		for (auto it = connections_listbox_str.begin(); it != connections_listbox_str.end(); it++)
+			connections_listbox.push_back(it->c_str());
 
 		static int connections_listbox_current = 0;
 		if (!connections_listbox.empty())
@@ -94,7 +94,7 @@ class ClientUpdater : public UpdaterListener
 
 			if (ImGui::Button("Disconnect"))
 			{
-				const ServerConnection& connection = conns[connections_listbox_current];
+				const Biribit::ServerConnection& connection = conns[connections_listbox_current];
 				client->Disconnect(connection.id);
 			}
 
@@ -127,10 +127,10 @@ public:
 		return console;
 	}
 
-	shared<BiribitClient> GetClient()
+	shared<Biribit::Client> GetClient()
 	{
 		if (client == nullptr)
-			client = shared<BiribitClient>(new BiribitClient());
+			client = shared<Biribit::Client>(new Biribit::Client());
 
 		return client;
 	}
