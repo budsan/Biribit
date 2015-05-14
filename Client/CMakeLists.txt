@@ -9,7 +9,7 @@ add_library(BiribitClient SHARED
 if(SYS_OS_WINDOWS)
 	set(CLIENT_LIBRARIES)
 elseif(SYS_OS_LINUX)
-	set(CLIENT_LIBRARIES rt pthread GL)
+	set(CLIENT_LIBRARIES rt pthread)
 endif()
 
 target_link_libraries(BiribitClient

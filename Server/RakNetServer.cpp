@@ -325,7 +325,7 @@ bool RakNetServer::WriteMessage(RakNet::BitStream& bstream,
 		return true;
 	}
 	else
-		BIRIBIT_WARN("%s unable to serialize.", msg.GetTypeName());
+		BIRIBIT_WARN("%s unable to serialize.", msg.GetTypeName().c_str());
 
 	return false;
 }

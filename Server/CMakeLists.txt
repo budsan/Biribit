@@ -9,7 +9,7 @@ add_executable(BiribitServer
 if(SYS_OS_WINDOWS)
 	set(SERVER_LIBRARIES)
 elseif(SYS_OS_LINUX)
-	set(SERVER_LIBRARIES rt pthread GL)
+	set(SERVER_LIBRARIES rt pthread)
 endif()
 
 target_link_libraries(BiribitServer
