@@ -5,7 +5,21 @@ package Proto;
 message Room
 {
 	required uint32 id = 1;
-	required uint32 maxclients = 2;
-	required string appid = 3;
-	repeated uint32 joined_id_client = 4;
+	repeated uint32 joined_id_client = 2;
+	optional uint32 entries_count = 3;
+}
+
+message RoomListResponse
+{
+	repeated Room rooms = 1;
+}
+
+message RoomCreateRequest
+{
+	required uint32 max_client_count = 1;
+}
+
+message RoomJoin
+{
+	optional uint32 id = 1;
 }

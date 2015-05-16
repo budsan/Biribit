@@ -27,12 +27,34 @@ class RakNetServer
 		id_t id;
 		std::string name;
 		std::string appid;
+		std::size_t room_joined;
 		RakNet::SystemAddress addr;
 	};
 
 	std::vector<unique<Client>> m_clients;
-	std::map<RakNet::SystemAddress, std::size_t> m_clientAddrMap;
-	std::map<std::string, std::size_t> m_clientNameMap;
+	std::map<RakNet::SystemAddress, Client::id_t> m_clientAddrMap;
+	std::map<std::string, Client::id_t> m_clientNameMap;
+
+	struct Room
+	{
+		typedef std::size_t id_t;
+		enum { UNASSIGNED_ID = 0 };
+
+		id_t id;
+		std::vector<Client::id_t> slots;
+		std::string appid;
+
+		struct Entry
+		{
+			std::size_t size;
+			char *data;
+		};
+
+		std::vector<Entry> journal;
+	};
+
+	std::vector<unique<Room>> m_rooms;
+	std::map<std::string, std::size_t> m_roomAppIdMap;
 
 	Client::id_t NewClient(RakNet::SystemAddress addr);
 	void RemoveClient(RakNet::SystemAddress addr);

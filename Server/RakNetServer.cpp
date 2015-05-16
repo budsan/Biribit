@@ -222,11 +222,11 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		RemoveClient(p->systemAddress);
 		break;
 	case ID_NEW_INCOMING_CONNECTION:
-		{
-			Client::id_t id = NewClient(p->systemAddress);
-			printLog("New client(%d) \"%s\" connected from %s.", id, m_clients[id]->name.c_str(), p->systemAddress.ToString());
-		}
+	{
+		Client::id_t id = NewClient(p->systemAddress);
+		printLog("New client(%d) \"%s\" connected from %s.", id, m_clients[id]->name.c_str(), p->systemAddress.ToString());
 		break;
+	}
 	case ID_INCOMPATIBLE_PROTOCOL_VERSION:
 		stream.Read(packetIdentifier);
 		printLog("%s has Raknet incompatible protocol version. Remote peer version: %d", p->systemAddress.ToString(), packetIdentifier);

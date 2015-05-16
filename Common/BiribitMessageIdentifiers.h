@@ -37,6 +37,24 @@ enum BiribitMessageIDTypes
 	ID_CLIENT_STATUS_UPDATED,
 	//sv > cl: follows Proto::Client
 
-	ID_CLIENT_DISCONNECTED
+	ID_CLIENT_DISCONNECTED,
 	//sv > cl: follows Proto::Client
+
+	ID_ROOM_LIST_REQUEST,
+	//cl > sv: nothing follows
+
+	ID_ROOM_LIST_RESPONSE,
+	//sv > cl: follows Proto::RoomList
+
+	ID_ROOM_CREATE_REQUEST,
+	//cl > sv: follows Proto::RoomCreateRequest
+
+	ID_ROOM_CREATE_RESPONSE,
+	//sv -> cl: follows Proto:Room
+
+	ID_ROOM_JOIN_REQUEST,
+	//cl -> sv: follows Proto::RoomJoin
+
+	ID_ROOM_JOIN_RESPONSE
+	//sv -> cl: follows Proto::RoomJoin
 };

@@ -8,5 +8,4 @@ package Proto;
 message ServerStatus
 {
 	repeated Client clients = 1;
-	repeated Room rooms = 2;
 }
