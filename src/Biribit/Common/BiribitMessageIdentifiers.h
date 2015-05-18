@@ -5,7 +5,8 @@
 #include <Room.pb.h>
 #include <ServerStatus.pb.h>
 
-#include "MessageIdentifiers.h"
+//RakNet
+#include <MessageIdentifiers.h>
 
 const unsigned short SERVER_DEFAULT_PORT = 8287;
 const unsigned int   SERVER_MAX_NUM_CLIENTS = 42;

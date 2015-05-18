@@ -1,17 +1,18 @@
 #pragma once
 
+#include <Biribit/Common/TaskPool.h>
+#include <Biribit/Common/Types.h>
+#include <Biribit/Common/Generic.h>
+#include <Biribit/Common/BiribitMessageIdentifiers.h>
+
 #include <thread>
 #include <mutex>
 #include <condition_variable>
 #include <vector>
 #include <functional>
 
-#include "RakPeerInterface.h"
-#include "TaskPool.h"
-#include <Types.h>
-#include <Generic.h>
-
-#include <BiribitMessageIdentifiers.h>
+//RakNet
+#include <RakPeerInterface.h>
 
 class RakNetServer
 {

@@ -1,5 +1,5 @@
-#include "BiribitClientExports.h"
-#include "PrintLog.h"
+#include <Biribit/Client/BiribitClientExports.h>
+#include <Biribit/Common/PrintLog.h>
 
 void BiribitClientClean()
 {

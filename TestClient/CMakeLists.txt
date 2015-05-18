@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 2.8)
 add_definitions(-DENABLE_IMGUI)
 
 add_executable(TestClient
-	${SYSTEM_LIB_CPPS}
 	Commands.cpp
 	CommandsClient.cpp
 	Console.cpp
@@ -28,9 +27,8 @@ target_link_libraries(TestClient
 	BiribitClient
 )
 
-if(SYS_OS_LINUX)
+if(SYS_OS_UNIX)
 	add_executable(TerminalClient
-		${SYSTEM_LIB_CPPS}
 		Commands.cpp
 		Console.cpp
 		Updater.cpp

@@ -1,4 +1,9 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.3)
+
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${BIRIBIT_RAKNET_INCLUDE_PATH}
+)
 
 add_executable(BiribitServer
 	${SYSTEM_LIB_CPPS}

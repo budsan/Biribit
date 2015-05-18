@@ -8,7 +8,6 @@
 #include "Commands.h"
 
 #include "OpenGL.h"
-#include "Generic.h"
 
 #include "imgui_impl_sdl2.h"
 #include "imgui.h"

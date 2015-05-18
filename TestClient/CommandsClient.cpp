@@ -1,14 +1,11 @@
 #include "Commands.h"
+
 #include <algorithm>
 #include <functional>
 #include <memory>
 #include <iostream>
 
-#include <BiribitConfig.h>
-#include <Types.h>
-
-#include "BiribitClient.h"
-#include "BiribitClientExports.h"
+#include <Biribit/Client.h>
 
 #ifdef ENABLE_IMGUI
 #include "imgui.h"
@@ -21,7 +18,7 @@ namespace Client
 
 class ClientUpdater : public UpdaterListener
 {
-	shared<Biribit::Client> client;
+	std::shared_ptr<Biribit::Client> client;
 	Console* console;
 	bool displayed;
 
@@ -159,10 +156,10 @@ public:
 		return console;
 	}
 
-	shared<Biribit::Client> GetClient()
+	std::shared_ptr<Biribit::Client> GetClient()
 	{
 		if (client == nullptr)
-			client = shared<Biribit::Client>(new Biribit::Client());
+			client = std::shared_ptr<Biribit::Client>(new Biribit::Client());
 
 		return client;
 	}

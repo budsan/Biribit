@@ -13,6 +13,10 @@ endmacro()
 # determine whether to create a debug or release build
 sys_set_option(CMAKE_BUILD_TYPE Release STRING "Choose the type of build (Debug or Release)")
 
+# set Protocol buffer specific options
+
+sys_set_option(PROTOC_EXECUTABLE "/usr/bin/protoc" PATH "Path to the Protoc executable")
+
 # set Android specific options
 
 # define the minimum API level to be used
@@ -33,8 +37,21 @@ endif()
 
 project(Biribit)
 
-# include the configuration file
+set(VERSION_MAJOR 0)
+set(VERSION_MINOR 1)
+set(VERSION_PATCH 0)
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Config.cmake)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+if(NOT (SYS_OS_IOS OR SYS_OS_ANDROID))
+    sys_set_option(BIRIBIT_BUILD_SERVER TRUE BOOL "TRUE to build the Biribit Server, FALSE to do not")
+    sys_set_option(BIRIBIT_BUILD_TEST TRUE BOOL "TRUE to build the Biribit Test Client, FALSE to do not")
+else()
+    set(BIRIBIT_BUILD_SERVER FALSE)
+    set(BIRIBIT_BUILD_TEST FALSE)
+endif()
 
 # Android options
 if(SYS_OS_ANDROID)
@@ -79,15 +96,6 @@ endif()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
 
-include_directories(
-	${CMAKE_CURRENT_SOURCE_DIR}/include
-	${CMAKE_CURRENT_SOURCE_DIR}/Common
-	${CMAKE_CURRENT_BINARY_DIR}/ProtoMessages
-	${CMAKE_CURRENT_SOURCE_DIR}/ProtoMessages/protobuf/src
-	${CMAKE_CURRENT_SOURCE_DIR}/RakNet/RakNet/Source
-	${CMAKE_CURRENT_SOURCE_DIR}/Client
-)
-
 if(SYS_OS_WINDOWS)
 	include_directories(${CMAKE_CURRENT_SOURCE_DIR}/TestClient/include)
 	if(ARCH_32BITS)
@@ -121,12 +129,10 @@ set(PROJECT_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/bin/)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_OUTPUT_PATH} CACHE PATH "Build directory" FORCE)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_OUTPUT_PATH} CACHE PATH "Build directory" FORCE)
 
-add_subdirectory(Common)
+SET(BIRIBIT_RAKNET_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/RakNet/RakNet/Source)
 add_subdirectory(RakNet)
-add_subdirectory(ProtoMessages)
-add_subdirectory(Client)
+add_subdirectory(src/Biribit)
 
-if (NOT SYS_OS_ANDROID)
-	add_subdirectory(Server)
+if(BIRIBIT_BUILD_TEST) 
 	add_subdirectory(TestClient)
 endif()

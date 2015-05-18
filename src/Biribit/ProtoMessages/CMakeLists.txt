@@ -1,4 +1,11 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.3)
+
+include(FindProtobuf)
+find_package(Protobuf REQUIRED)
+
+if("${PROTOBUF_PROTOC_EXECUTABLE}" STREQUAL "PROTOBUF_PROTOC_EXECUTABLE-NOTFOUND")
+	set(PROTOBUF_PROTOC_EXECUTABLE "${PROTOC_EXECUTABLE}")
+endif()
 
 if(SYS_OS_WINDOWS)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/protobuf/vsprojects)
@@ -10,7 +17,6 @@ if(SYS_OS_WINDOWS)
         protobuf/src/google/protobuf/arenastring.cc
     )
 elseif (SYS_OS_ANDROID)
-    set(PROTOBUF_PROTOC_EXECUTABLE $ENV{PROTOC_EXECUTABLE})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/android/)
     set(PROTOBUF_PLATFORM_SRC_FILES
         protobuf/src/google/protobuf/stubs/stringprintf.cc
@@ -42,11 +48,8 @@ set(PROTOBUF_COMMON_SRC_FILES
 )
 
 set(PROTOBUF_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/src)
-
-include(FindProtobuf)
-find_package(Protobuf REQUIRED)
 include_directories(${PROTOBUF_INCLUDE_DIR})
-    
+
 FILE(GLOB ALL_PROTO_SRCS *.proto)
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${ALL_PROTO_SRCS})
 

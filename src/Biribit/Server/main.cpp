@@ -1,6 +1,6 @@
-#include "RakNetServer.h"
-#include <BiribitConfig.h>
-#include "Types.h"
+#include <Biribit/Server/RakNetServer.h>
+#include <Biribit/BiribitConfig.h>
+#include <Biribit/Common/Types.h>
 
 #include <iostream>
 #include <fstream>

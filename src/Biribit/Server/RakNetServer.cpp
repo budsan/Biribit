@@ -1,20 +1,20 @@
-#include "RakNetServer.h"
-#include "Types.h"
-#include "PrintLog.h"
+#include <Biribit/Server/RakNetServer.h>
+#include <Biribit/Common/Types.h>
+#include <Biribit/Common/PrintLog.h>
+#include <Biribit/Common/Debug.h>
+#include <Biribit/Common/Generic.h>
+#include <Biribit/Common/BiribitMessageIdentifiers.h>
 
 #include <sstream>
 #include <chrono>
 
-#include "MessageIdentifiers.h"
-#include "RakNetStatistics.h"
-#include "RakNetTypes.h"
-#include "BitStream.h"
-#include "RakSleep.h"
-#include "PacketLogger.h"
-
-#include <debug.h>
-#include <Generic.h>
-#include <BiribitMessageIdentifiers.h>
+//RakNet
+#include <MessageIdentifiers.h>
+#include <RakNetStatistics.h>
+#include <RakNetTypes.h>
+#include <BitStream.h>
+#include <RakSleep.h>
+#include <PacketLogger.h>
 
 const char* randomNames[] = {
 	"Arianne", "Kesha", "Minerva",

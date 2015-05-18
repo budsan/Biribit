@@ -1,30 +1,29 @@
-#include "BiribitClient.h"
-#include "TaskPool.h"
-#include "PrintLog.h"
-#include "Packet.h"
+#include <Biribit/Client/BiribitClient.h>
+
+#include <Biribit/Packet.h>
+#include <Biribit/Common/PrintLog.h>
+#include <Biribit/Common/BiribitMessageIdentifiers.h>
+#include <Biribit/Common/Debug.h>
+#include <Biribit/Common/RefSwap.h>
+#include <Biribit/Common/TaskPool.h>
+#include <Biribit/Common/Types.h>
+#include <Biribit/Common/Generic.h>
 
 #include <map>
 #include <vector>
 #include <array>
 #include <functional>
 
-#include "MessageIdentifiers.h"
-#include "RakPeerInterface.h"
-#include "RakNetStatistics.h"
-#include "RakNetTypes.h"
-#include "BitStream.h"
-#include "PacketLogger.h"
-#include "RakNetTypes.h"
-#include "StringCompressor.h"
-#include "GetTime.h"
-
-#include <BiribitMessageIdentifiers.h>
-
-#include "debug.h"
-#include "RefSwap.h"
-#include "TaskPool.h"
-#include <Types.h>
-#include <Generic.h>
+//RakNet
+#include <MessageIdentifiers.h>
+#include <RakPeerInterface.h>
+#include <RakNetStatistics.h>
+#include <RakNetTypes.h>
+#include <BitStream.h>
+#include <PacketLogger.h>
+#include <RakNetTypes.h>
+#include <StringCompressor.h>
+#include <GetTime.h>
 
 namespace Biribit
 {

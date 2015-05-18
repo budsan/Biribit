@@ -1,4 +1,4 @@
-#include "Generic.h"
+#include <Biribit/Common/Generic.h>
 
 namespace Generic
 {

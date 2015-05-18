@@ -1,4 +1,4 @@
-#include "Packet.h"
+#include <Biribit/Packet.h>
 #include <cstring>
 #include <cwchar>
 

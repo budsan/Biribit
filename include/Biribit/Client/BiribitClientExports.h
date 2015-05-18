@@ -1,6 +1,6 @@
 #pragma once
 
-#include <BiribitConfig.h>
+#include <Biribit/BiribitConfig.h>
 #include <cstdarg>
 
 typedef void (STDCALL *BiribitClientLogCallback)(const char*);

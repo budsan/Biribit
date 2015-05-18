@@ -3,7 +3,7 @@
 #include <string>
 
 #include "SDLcpp.h"
-#include <OpenGL.h>
+#include "OpenGL.h"
 
 #include "Game.h"
 

@@ -1,5 +1,5 @@
-#include "PrintLog.h"
-#include "TaskPool.h"
+#include <Biribit/Common/PrintLog.h>
+#include <Biribit/Common/TaskPool.h>
 
 #include <string>
 #include <cstdarg>
