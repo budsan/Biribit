@@ -10,7 +10,7 @@ if(SYS_OS_WINDOWS)
         protobuf/src/google/protobuf/arenastring.cc
     )
 elseif (SYS_OS_ANDROID)
-    set(PROTOBUF_PROTOC_EXECUTABLE /usr/bin/protoc)
+    set(PROTOBUF_PROTOC_EXECUTABLE $ENV{PROTOC_EXECUTABLE})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/android/)
     set(PROTOBUF_PLATFORM_SRC_FILES
         protobuf/src/google/protobuf/stubs/stringprintf.cc

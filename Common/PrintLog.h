@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Config.h>
+#include <BiribitConfig.h>
 #include <stdarg.h>
 
 void Log_Init();

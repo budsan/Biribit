@@ -5,7 +5,7 @@
 #include <vector>
 #include <cstdint>
 
-#include "Config.h"
+#include <BiribitConfig.h>
 
 ////////////////////////////////////////////////////////////
 /// \brief Utility class to build blocks of data to transfer

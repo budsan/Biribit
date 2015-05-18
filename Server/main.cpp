@@ -1,5 +1,5 @@
 #include "RakNetServer.h"
-#include "Config.h"
+#include <BiribitConfig.h>
 #include "Types.h"
 
 #include <iostream>

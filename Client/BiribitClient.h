@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "Config.h"
+#include <BiribitConfig.h>
 
 namespace Biribit
 {

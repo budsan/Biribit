@@ -4,7 +4,7 @@
 #include <memory>
 #include <iostream>
 
-#include <Config.h>
+#include <BiribitConfig.h>
 #include <Types.h>
 
 #include "BiribitClient.h"

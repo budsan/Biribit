@@ -1,7 +1,7 @@
 #ifndef OPENGL_HPP
 #define OPENGL_HPP
 
-#include <Config.h>
+#include <BiribitConfig.h>
 
 ////////////////////////////////////////////////////////////
 /// This file just includes the OpenGL (GL and GLU) headers,
