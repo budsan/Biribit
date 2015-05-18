@@ -10,6 +10,7 @@
 #include <condition_variable>
 #include <vector>
 #include <functional>
+#include <cstdint>
 
 //RakNet
 #include <RakPeerInterface.h>
@@ -22,14 +23,17 @@ class RakNetServer
 
 	struct Client
 	{
-		typedef std::size_t id_t;
+		typedef std::uint32_t id_t;
 		enum { UNASSIGNED_ID = 0 };
 
 		id_t id;
 		std::string name;
 		std::string appid;
-		std::size_t room_joined;
+		std::uint32_t joined_room;
+		std::uint32_t joined_slot;
 		RakNet::SystemAddress addr;
+
+		Client();
 	};
 
 	std::vector<unique<Client>> m_clients;
@@ -38,10 +42,11 @@ class RakNetServer
 
 	struct Room
 	{
-		typedef std::size_t id_t;
+		typedef std::uint32_t id_t;
 		enum { UNASSIGNED_ID = 0 };
 
 		id_t id;
+		std::uint32_t joined_clients_count;
 		std::vector<Client::id_t> slots;
 		std::string appid;
 
@@ -61,8 +66,12 @@ class RakNetServer
 	void RemoveClient(RakNet::SystemAddress addr);
 	void UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate* proto_update);
 
+	void JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_join);
+
 	void PopulateProtoServerInfo(Proto::ServerInfo* proto_info);
 	void PopulateProtoClient(unique<Client>& client, Proto::Client* proto_client);
+	void PopulateProtoRoom(unique<Room>& room, Proto::Room* proto_room);
+	void PopulateProtoRoomJoin(unique<Client>& client, Proto::RoomJoin* proto_join);
 
 	unique<TaskPool> m_pool;
 	Generic::TempBuffer m_buffer;

@@ -6,7 +6,7 @@ message Room
 {
 	required uint32 id = 1;
 	repeated uint32 joined_id_client = 2;
-	optional uint32 entries_count = 3;
+	optional uint32 journal_entries_count = 3;
 }
 
 message RoomListResponse
@@ -16,10 +16,12 @@ message RoomListResponse
 
 message RoomCreateRequest
 {
-	required uint32 max_client_count = 1;
+	required uint32 client_slots = 1;
+	optional uint32 slot_to_join = 2;
 }
 
 message RoomJoin
 {
 	optional uint32 id = 1;
+	optional uint32 slot_to_join = 2;
 }

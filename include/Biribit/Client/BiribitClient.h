@@ -22,7 +22,7 @@ struct API_EXPORT ServerInfo
 
 struct API_EXPORT ServerConnection
 {
-	typedef std::size_t id_t;
+	typedef std::uint32_t id_t;
 	enum { UNASSIGNED_ID = 0 };
 
 	id_t id;
@@ -34,7 +34,7 @@ struct API_EXPORT ServerConnection
 
 struct API_EXPORT RemoteClient
 {
-	typedef std::size_t id_t;
+	typedef std::uint32_t id_t;
 	enum { UNASSIGNED_ID = 0 };
 
 	id_t id;

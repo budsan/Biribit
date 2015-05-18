@@ -2,7 +2,6 @@ syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
 import "Client.proto";
-import "Room.proto";
 
 package Proto;
 message ServerStatus

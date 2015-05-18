@@ -56,20 +56,23 @@ int main(int argc, char** argv)
 
 		TCLAP::ValueArg<std::string> nameArg0("n", "name", "Server name shown", false, "", "name");
 		TCLAP::ValueArg<std::string> nameArg1("p", "port", "Port to bind", false, "", "port");
+		TCLAP::ValueArg<std::string> nameArg2("w", "password", "Server password", false, "", "password");
 
 		cmd.add(nameArg0);
 		cmd.add(nameArg1);
+		cmd.add(nameArg2);
 		cmd.parse(argc, argv);
 
 		// Get the value parsed by each arg. 
 		std::string name = nameArg0.getValue();
 		std::string port = nameArg1.getValue();
+		std::string pass = nameArg2.getValue();
 
 		int iPort = 0;
 		std::stringstream ssPort(port);
 		ssPort >> iPort;
 
-		if (server.Run(iPort, name.length() == 0 ? nullptr : name.c_str()))
+		if (server.Run(iPort, name.empty() ? nullptr : name.c_str(), pass.empty() ? nullptr : pass.c_str()))
 		{
 			char c;
 			while (server.isRunning() && std::cin >> c)
