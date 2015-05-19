@@ -9,6 +9,8 @@
 #include <mutex>
 #include <condition_variable>
 #include <vector>
+#include <map>
+#include <set>
 #include <functional>
 #include <cstdint>
 
@@ -60,13 +62,16 @@ class RakNetServer
 	};
 
 	std::vector<unique<Room>> m_rooms;
-	std::map<std::string, std::size_t> m_roomAppIdMap;
+	std::map<std::string, std::set<Room::id_t>> m_roomAppIdMap;
 
 	Client::id_t NewClient(RakNet::SystemAddress addr);
 	void RemoveClient(RakNet::SystemAddress addr);
 	void UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate* proto_update);
 
+	void ListRooms(RakNet::SystemAddress addr);
+	void CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* proto_create);
 	void JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_join);
+	bool LeaveRoom(unique<Client>& client);
 
 	void PopulateProtoServerInfo(Proto::ServerInfo* proto_info);
 	void PopulateProtoClient(unique<Client>& client, Proto::Client* proto_client);

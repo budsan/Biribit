@@ -51,6 +51,7 @@ template<int N> int sizeof_string_array(const char* (&s)[N]) { return N; }
 RakNetServer::RakNetServer()
 	: m_peer(nullptr)
 	, m_clients(1)
+	, m_rooms(1)
 {
 }
 
@@ -167,7 +168,7 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 			++tries;
 		}
 
-		// some other client is using that name
+		// another client is using that name
 		if (already_used)
 		{
 			RakNet::BitStream bstream;
@@ -181,6 +182,8 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 		m_clients[itAddr->second]->appid = proto_update->appid();
 		printLog("Client(%d) \"%s\" changed appid to \"%s\".", itAddr->second, m_clients[itAddr->second]->name.c_str(), proto_update->appid().c_str());
 		updated = true;
+
+		LeaveRoom(m_clients[itAddr->second]);
 	}
 
 	if (updated)
@@ -191,6 +194,87 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 		if (WriteMessage(bstream, ID_CLIENT_STATUS_UPDATED, proto_client))
 			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 	}
+}
+
+void RakNetServer::ListRooms(RakNet::SystemAddress addr)
+{
+	auto itAddr = m_clientAddrMap.find(addr);
+	BIRIBIT_ASSERT(itAddr != m_clientAddrMap.end());
+	BIRIBIT_ASSERT(itAddr->second < m_clients.size());
+	BIRIBIT_ASSERT(m_clients[itAddr->second] != nullptr);
+
+	unique<Client>& client = m_clients[itAddr->second];
+	if (client->appid.empty()) {
+		printLog("WARN: Client (%d) \"%s\" can't list rooms without appid.", client->id, client->name);
+		return;
+	}
+
+	Proto::RoomList proto_list;
+	auto set_it = m_roomAppIdMap.find(client->appid);
+	if (set_it != m_roomAppIdMap.end())
+	{
+		for (auto it = set_it->second.begin(); it != set_it->second.end(); it++) {
+			BIRIBIT_ASSERT(m_rooms[*it] != nullptr);
+			Proto::Room* room_to_add = proto_list.add_rooms();
+			PopulateProtoRoom(m_rooms[*it], room_to_add);
+		}
+	}
+
+	RakNet::BitStream bstream;
+	if (WriteMessage(bstream, ID_ROOM_LIST_RESPONSE, proto_list)) {
+		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
+	}
+}
+
+void RakNetServer::CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* proto_create)
+{
+	auto itAddr = m_clientAddrMap.find(addr);
+	BIRIBIT_ASSERT(itAddr != m_clientAddrMap.end());
+	BIRIBIT_ASSERT(itAddr->second < m_clients.size());
+	BIRIBIT_ASSERT(m_clients[itAddr->second] != nullptr);
+
+	unique<Client>& client = m_clients[itAddr->second];
+	if (client->appid.empty()) {
+		printLog("WARN: Client (%d) \"%s\" can't create a room without appid.", client->id, client->name);
+		return;
+	}
+
+	if (!proto_create->has_client_slots() || proto_create->client_slots() == 0) {
+		printLog("WARN: Client (%d) \"%s\" tried to create a room with a wrong slot number.", client->id, client->name);
+		return;
+	}
+
+	std::size_t i = 1;
+	for (; i < m_rooms.size() && m_rooms[i] != nullptr; i++);
+	if (i == m_rooms.size())
+		m_rooms.push_back(nullptr);
+
+	m_rooms[i] = unique<Room>(new Room());
+	unique<Room>& room = m_rooms[i];
+	room->id = i;
+	room->appid = client->appid;
+	room->slots.resize(proto_create->client_slots(), Client::UNASSIGNED_ID);
+	room->journal.clear();
+
+	std::set<Room::id_t>& room_set = m_roomAppIdMap[room->appid];
+	auto result = room_set.insert(room->id);
+	BIRIBIT_ASSERT(result.second);
+
+	printLog("Created room %d for the app %s.", room->id, room->appid);
+
+	Proto::Room proto_room;
+	PopulateProtoRoom(room, &proto_room);
+	RakNet::BitStream bstream;
+	if (WriteMessage(bstream, ID_ROOM_CREATED, proto_room)) {
+		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
+	}
+		
+	Proto::RoomJoin proto_join;
+	proto_join.set_id(room->id);
+	if (proto_create->has_slot_to_join())
+		proto_join.set_slot_to_join(proto_create->slot_to_join());
+
+	JoinRoom(addr, &proto_join);
 }
 
 void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_join)
@@ -208,7 +292,7 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 
 	std::uint32_t id = proto_join->id();
 	std::uint32_t slot;
-	if (id > Room::UNASSIGNED_ID)
+	if (id != Room::UNASSIGNED_ID)
 	{
 		if (m_rooms[id] == nullptr) {
 			printLog("WARN: Client (%d) \"%s\" tried to join to unexisting room.", client->id, client->name);
@@ -237,8 +321,31 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 			}
 		}
 	}
-	
 
+	bool something_changed = LeaveRoom(client);
+	if (id != Room::UNASSIGNED_ID)
+	{
+		unique<Room>& room = m_rooms[id];
+		room->slots[slot] = client->id;
+		room->joined_clients_count++;
+		client->joined_room = id;
+		client->joined_slot = slot;
+		printLog("Client (%d) \"%s\" joins room %d.", client->id, client->name, room->id);
+		something_changed = true;
+	}
+
+	if (something_changed)
+	{
+		Proto::RoomJoin proto_join;
+		PopulateProtoRoomJoin(client, &proto_join);
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
+	}
+}
+
+bool RakNetServer::LeaveRoom(unique<Client>& client)
+{
 	if (client->joined_room > 0)
 	{
 		BIRIBIT_ASSERT(m_rooms[client->joined_room] != nullptr);
@@ -252,26 +359,19 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 
 		printLog("Client (%d) \"%s\" leaves room %d.", client->id, client->name, room->id);
 		if (room->joined_clients_count == 0) {
+			std::size_t erased = m_roomAppIdMap[room->appid].erase(room->id);
+			BIRIBIT_ASSERT(erased > 0);
+			if (m_roomAppIdMap[room->appid].empty())
+				m_roomAppIdMap.erase(room->appid);
+	
 			printLog("Room %d is empty. Closing room.", room->id);
 			m_rooms[room->id] = nullptr;
 		}
+
+		return true;
 	}
 
-	if (id > Room::UNASSIGNED_ID)
-	{
-		unique<Room>& room = m_rooms[id];
-		room->slots[slot] = client->id;
-		room->joined_clients_count++;
-		client->joined_room = id;
-		client->joined_slot = slot;
-		printLog("Client (%d) \"%s\" joins room %d.", client->id, client->name, room->id);
-
-		Proto::RoomJoin proto_join;
-		PopulateProtoRoomJoin(client, &proto_join);
-		RakNet::BitStream bstream;
-		if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
-	}
+	return false;
 }
 
 void RakNetServer::PopulateProtoServerInfo(Proto::ServerInfo* proto_info)
@@ -293,13 +393,14 @@ void RakNetServer::PopulateProtoRoom(unique<Room>& room, Proto::Room* proto_room
 	for (std::size_t i = 0; i < room->slots.size(); i++)
 		proto_room->add_joined_id_client(room->slots[i]);
 
-	proto_room->set_entries_count(room->journal.size());
+	proto_room->set_journal_entries_count(room->journal.size());
 }
 
 void RakNetServer::PopulateProtoRoomJoin(unique<Client>& client, Proto::RoomJoin* proto_join)
 {
 	proto_join->set_id(client->joined_room);
-	proto_join->set_slot_to_join(client->joined_slot);
+	if (client->joined_room != Room::UNASSIGNED_ID)
+		proto_join->set_slot_to_join(client->joined_slot);
 }
 
 void RakNetServer::RaknetThreadUpdate(RakNet::RakPeerInterface *peer, void* data)
@@ -423,18 +524,20 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		BIRIBIT_WARN("Nothing to do with ID_CLIENT_DISCONNECTED");
 		break;
 	case ID_ROOM_LIST_REQUEST:
-		//cl > sv: nothing follows
-		//sv > cl: ID_ROOM_LIST_RESPONSE follows Proto::RoomList
+		ListRooms(p->systemAddress);
 		break;
 	case ID_ROOM_LIST_RESPONSE:
 		BIRIBIT_WARN("Nothing to do with ID_ROOM_LIST_RESPONSE");
 		break;
 	case ID_ROOM_CREATE_REQUEST:
-		//cl > sv: follows Proto::RoomCreateRequest
-		//sv -> cl: ID_ROOM_CREATE_RESPONSE follows Proto:Room
+	{
+		Proto::RoomCreate proto_create;
+		if (ReadMessage(proto_create, stream))
+			CreateRoom(p->systemAddress, &proto_create);
 		break;
-	case ID_ROOM_CREATE_RESPONSE:
-		BIRIBIT_WARN("Nothing to do with ID_ROOM_CREATE_RESPONSE");
+	}
+	case ID_ROOM_CREATED:
+		BIRIBIT_WARN("Nothing to do with ID_ROOM_CREATED");
 		break;
 	case ID_ROOM_JOIN_REQUEST:
 	{

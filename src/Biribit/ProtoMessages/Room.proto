@@ -9,12 +9,12 @@ message Room
 	optional uint32 journal_entries_count = 3;
 }
 
-message RoomListResponse
+message RoomList
 {
 	repeated Room rooms = 1;
 }
 
-message RoomCreateRequest
+message RoomCreate
 {
 	required uint32 client_slots = 1;
 	optional uint32 slot_to_join = 2;
