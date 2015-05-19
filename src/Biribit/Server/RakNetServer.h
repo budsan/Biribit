@@ -72,6 +72,7 @@ class RakNetServer
 	void CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* proto_create);
 	void JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_join);
 	bool LeaveRoom(unique<Client>& client);
+	void RoomChanged(unique<Room>& room, RakNet::SystemAddress extra_addr_to_notify = RakNet::UNASSIGNED_SYSTEM_ADDRESS);
 
 	void PopulateProtoServerInfo(Proto::ServerInfo* proto_info);
 	void PopulateProtoClient(unique<Client>& client, Proto::Client* proto_client);

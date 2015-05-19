@@ -86,6 +86,11 @@ public:
 	std::vector<RemoteClient> clients;
 	RefSwap<std::vector<RemoteClient>> clientsListReq;
 
+	std::vector<Room> rooms;
+	RefSwap<std::vector<Room>> roomsListReq;
+	Room::id_t joinedRoom;
+	std::uint32_t joinedSlot;
+
 	ServerConnectionPriv();
 	bool isNull();
 };
@@ -93,6 +98,8 @@ public:
 ServerConnectionPriv::ServerConnectionPriv()
 	: addr(RakNet::UNASSIGNED_SYSTEM_ADDRESS)
 	, selfId(RemoteClient::UNASSIGNED_ID)
+	, joinedRoom(Room::UNASSIGNED_ID)
+	, joinedSlot(0)
 {
 }
 
@@ -147,6 +154,15 @@ public:
 	RemoteClient::id_t GetLocalClientId(ServerConnection::id_t id);
 	void SetLocalClientParameters(ServerConnection::id_t id, const ClientParameters& parameters);
 
+	void RefreshRooms(ServerConnection::id_t id);
+	const std::vector<Room>& GetRooms(ServerConnection::id_t id);
+
+	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots);
+	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id);
+
+	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id);
+	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::uint32_t slot_id);
+
 private: 
 	RakNet::RakPeerInterface *m_peer;
 	unique<TaskPool> m_pool;
@@ -164,9 +180,11 @@ private:
 
 	enum TypeUpdateRemoteClient {UPDATE_REMOTE_CLIENT, UPDATE_SELF_CLIENT, UPDATE_REMOTE_DISCONNECTION};
 	void UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type);
+	void UpdateRoom(RakNet::SystemAddress addr, const Proto::Room* proto_room);
 
 	static void PopulateServerInfo(ServerInfoPriv&, const Proto::ServerInfo*);
 	static void PopulateRemoteClient(RemoteClient&, const Proto::Client*);
+	static void PopulateRoom(Room&, const Proto::Room*);
 
 	Generic::TempBuffer m_buffer;
 	
@@ -410,17 +428,135 @@ void ClientImpl::SetLocalClientParameters(ServerConnection::id_t id, const Clien
 	ClientParameters parameters = _parameters;
 	m_pool->enqueue([this, id, parameters]()
 	{
+		ServerConnectionPriv& conn = m_connections[id];
+		if (conn.isNull())
+			return;
+
 		bool ready = false;
 		Proto::ClientUpdate proto_update;
 		proto_update.set_name(parameters.name);
-		proto_update.set_appid(parameters.appid);
-
-		ServerConnectionPriv& conn = m_connections[id];
+		if (!parameters.appid.empty())
+			proto_update.set_appid(parameters.appid);
 		conn.requested = parameters;
 
 		RakNet::BitStream bstream;
 		WriteMessage(bstream, ID_CLIENT_UPDATE_STATUS, proto_update);
 		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, conn.addr, false);
+	});
+}
+
+void ClientImpl::RefreshRooms(ServerConnection::id_t id)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	m_pool->enqueue([this, id]()
+	{
+		ServerConnectionPriv& conn = m_connections[id];
+		SendProtocolMessageID(ID_ROOM_LIST_REQUEST, conn.addr);
+	});
+}
+
+const std::vector<Room>& ClientImpl::GetRooms(ServerConnection::id_t id)
+{
+	static std::vector<Room> empty;
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return empty;
+
+	if (m_connections[id].roomsListReq.request())
+	{
+		m_pool->enqueue([this, id]()
+		{
+			ServerConnectionPriv& sc = m_connections[id];
+			std::vector<Room>& back = sc.roomsListReq.back();
+			back.clear();
+
+			for (auto it = sc.rooms.begin(); it != sc.rooms.end(); it++)
+				if (it->id != Room::UNASSIGNED_ID)
+					back.push_back(*it);
+
+			sc.roomsListReq.swap();
+		});
+	}
+
+	return m_connections[id].roomsListReq.front();
+}
+
+void ClientImpl::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	m_pool->enqueue([this, id, num_slots]()
+	{
+		ServerConnectionPriv& conn = m_connections[id];
+		if (conn.isNull())
+			return;
+
+		Proto::RoomCreate proto_create;
+		proto_create.set_client_slots(num_slots);
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_ROOM_CREATE_REQUEST, proto_create))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, conn.addr, false);
+	});
+}
+
+void ClientImpl::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	m_pool->enqueue([this, id, num_slots, slot_to_join_id]()
+	{
+		ServerConnectionPriv& conn = m_connections[id];
+		if (conn.isNull())
+			return;
+
+		Proto::RoomCreate proto_create;
+		proto_create.set_client_slots(num_slots);
+		proto_create.set_slot_to_join(slot_to_join_id);
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_ROOM_CREATE_REQUEST, proto_create))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, conn.addr, false);
+	});
+}
+
+void ClientImpl::JoinRoom(ServerConnection::id_t id, Room::id_t room_id)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	m_pool->enqueue([this, id, room_id]()
+	{
+		ServerConnectionPriv& conn = m_connections[id];
+		if (conn.isNull())
+			return;
+
+		Proto::RoomJoin proto_join;
+		proto_join.set_id(room_id);
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_ROOM_JOIN_REQUEST, proto_join))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, conn.addr, false);
+	});
+}
+
+void ClientImpl::JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::uint32_t slot_id)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	m_pool->enqueue([this, id, room_id, slot_id]()
+	{
+		ServerConnectionPriv& conn = m_connections[id];
+		if (conn.isNull())
+			return;
+
+		Proto::RoomJoin proto_join;
+		proto_join.set_id(room_id);
+		proto_join.set_slot_to_join(slot_id);
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_ROOM_JOIN_REQUEST, proto_join))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, conn.addr, false);
 	});
 }
 
@@ -603,13 +739,11 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			}
 
 			sc.clientsListReq.set_dirty();
-
-			//TODO: ROOMS
 		}
 		break;
 	}
 	case ID_CLIENT_UPDATE_STATUS:
-		BIRIBIT_WARN("Nothing to do with ID_SERVER_STATUS_RESPONSE");
+		BIRIBIT_WARN("Nothing to do with ID_CLIENT_UPDATE_STATUS");
 		break;
 	case ID_CLIENT_NAME_IN_USE:
 		//TODO
@@ -626,6 +760,64 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		Proto::Client proto_client;
 		if (ReadMessage(proto_client, packet))
 			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_REMOTE_DISCONNECTION);
+		break;
+	}
+	case ID_ROOM_LIST_REQUEST:
+		BIRIBIT_WARN("Nothing to do with ID_ROOM_LIST_REQUEST");
+		break;
+	case ID_ROOM_LIST_RESPONSE:
+	{
+		Proto::RoomList proto_list;
+		if (ReadMessage(proto_list, packet))
+		{
+			ServerInfoPriv& si = serverList[pPacket->systemAddress];
+			BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
+			ServerConnectionPriv& sc = m_connections[si.id];
+
+			std::uint32_t max = 0;
+			int rooms_size = proto_list.rooms_size();
+			for (int i = 0; i < rooms_size; i++)
+				if (proto_list.rooms(i).has_id())
+					max = std::max(proto_list.rooms(i).id(), max);
+
+			sc.rooms.resize(max + 1);
+			for (int i = 0; i < rooms_size; i++) {
+				const Proto::Room& proto_room = proto_list.rooms(i);
+				if (proto_room.has_id())
+					PopulateRoom(sc.rooms[proto_room.id()], &proto_room);
+			}
+
+			sc.roomsListReq.set_dirty();
+		}
+		break;
+	}
+	case ID_ROOM_CREATE_REQUEST:
+		BIRIBIT_WARN("Nothing to do with ID_ROOM_CREATE_REQUEST");
+		break;
+	case ID_ROOM_CHANGED:
+	{
+		Proto::Room proto_room;
+		if (ReadMessage(proto_room, packet))
+			UpdateRoom(pPacket->systemAddress, &proto_room);
+		break;
+	}
+	case ID_ROOM_JOIN_REQUEST:
+		BIRIBIT_WARN("Nothing to do with ID_ROOM_JOIN_REQUEST");
+		break;
+	case ID_ROOM_JOIN_RESPONSE:
+	{
+		Proto::RoomJoin proto_join;
+		if (ReadMessage(proto_join, packet))
+		{
+			ServerInfoPriv& si = serverList[pPacket->systemAddress];
+			BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
+			ServerConnectionPriv& sc = m_connections[si.id];
+			if (proto_join.has_id() && proto_join.has_slot_to_join())
+			{
+				sc.joinedRoom = proto_join.id();
+				sc.joinedSlot = proto_join.slot_to_join();
+			}	
+		}
 		break;
 	}
 	default:
@@ -670,6 +862,7 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 			printLog("Disconnected from %s.", sc.data.name.c_str());
 
 		sc.addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
+		sc.selfId = RemoteClient::UNASSIGNED_ID;
 		si.id = ServerConnection::UNASSIGNED_ID;
 		connectionsListReq.set_dirty();
 	}
@@ -703,6 +896,22 @@ void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Cli
 	}
 }
 
+void ClientImpl::UpdateRoom(RakNet::SystemAddress addr, const Proto::Room* proto_room)
+{
+	ServerInfoPriv& si = serverList[addr];
+	BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
+	ServerConnectionPriv& sc = m_connections[si.id];
+	if (proto_room->has_id())
+	{
+		std::uint32_t id = proto_room->id();
+		if (id >= sc.rooms.size())
+			sc.rooms.resize(id + 1);
+
+		PopulateRoom(sc.rooms[id], proto_room);
+		sc.roomsListReq.set_dirty();
+	}
+}
+
 void ClientImpl::PopulateServerInfo(ServerInfoPriv& si, const Proto::ServerInfo* proto_info)
 {
 	if (proto_info->has_name()){
@@ -724,6 +933,16 @@ void ClientImpl::PopulateRemoteClient(RemoteClient& remote, const Proto::Client*
 
 	if (proto_client->has_appid())
 		remote.appid = proto_client->appid();
+}
+
+void ClientImpl::PopulateRoom(Room& room, const Proto::Room* proto_room)
+{
+	if (proto_room->has_id())
+		room.id = proto_room->id();
+
+	int joined_id_client_size = proto_room->joined_id_client_size();
+	room.slots.resize(joined_id_client_size);
+	
 }
 
 //---------------------------------------------------------------------------//
@@ -791,5 +1010,36 @@ void Client::SetLocalClientParameters(ServerConnection::id_t id, const ClientPar
 {
 	m_impl->SetLocalClientParameters(id, parameters);
 }
+
+void Client::RefreshRooms(ServerConnection::id_t id)
+{
+	m_impl->RefreshRooms(id);
+}
+
+const std::vector<Room>& Client::GetRooms(ServerConnection::id_t id)
+{
+	return m_impl->GetRooms(id);
+}
+
+void Client::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots)
+{
+	m_impl->CreateRoom(id, num_slots);
+}
+
+void Client::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id)
+{
+	m_impl->CreateRoom(id, num_slots, slot_to_join_id);
+}
+
+void Client::JoinRoom(ServerConnection::id_t id, Room::id_t room_id)
+{
+	m_impl->JoinRoom(id, room_id);
+}
+
+void Client::JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::uint32_t slot_id)
+{
+	m_impl->JoinRoom(id, room_id, slot_id);
+}
+
 
 }

@@ -53,6 +53,15 @@ struct API_EXPORT ClientParameters
 	ClientParameters(const std::string& name, const std::string& appid);
 };
 
+struct API_EXPORT Room
+{
+	typedef std::uint32_t id_t;
+	enum { UNASSIGNED_ID = 0 };
+
+	id_t id;
+	std::vector<RemoteClient::id_t> slots;
+};
+
 class ClientImpl;
 class API_EXPORT Client
 {
@@ -75,6 +84,15 @@ public:
 
 	RemoteClient::id_t GetLocalClientId(ServerConnection::id_t id);
 	void SetLocalClientParameters(ServerConnection::id_t id, const ClientParameters& parameters);
+
+	void RefreshRooms(ServerConnection::id_t id);
+	const std::vector<Room>& GetRooms(ServerConnection::id_t id);
+
+	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots);
+	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id);
+
+	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id);
+	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::uint32_t slot_id);
 
 private:
 	ClientImpl* m_impl;

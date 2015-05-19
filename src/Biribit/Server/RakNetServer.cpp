@@ -98,12 +98,12 @@ RakNetServer::Client::id_t RakNetServer::NewClient(RakNet::SystemAddress addr)
 	{
 		RakNet::BitStream bstream;
 		if (WriteMessage(bstream, ID_CLIENT_STATUS_UPDATED, proto_client))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 	}
 	{
 		RakNet::BitStream bstream;
 		if (WriteMessage(bstream, ID_CLIENT_SELF_STATUS, proto_client))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
 	}
 
 	return i;
@@ -131,7 +131,7 @@ void RakNetServer::RemoveClient(RakNet::SystemAddress addr)
 
 	RakNet::BitStream bstream;
 	if (WriteMessage(bstream, ID_CLIENT_DISCONNECTED, proto_client))
-		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 }
 
 void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate* proto_update)
@@ -173,7 +173,7 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 		{
 			RakNet::BitStream bstream;
 			bstream.Write((RakNet::MessageID)ID_CLIENT_NAME_IN_USE);
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
 		}
 	}
 
@@ -192,7 +192,7 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 		PopulateProtoClient(m_clients[itAddr->second], &proto_client);
 		RakNet::BitStream bstream;
 		if (WriteMessage(bstream, ID_CLIENT_STATUS_UPDATED, proto_client))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 	}
 }
 
@@ -222,7 +222,7 @@ void RakNetServer::ListRooms(RakNet::SystemAddress addr)
 
 	RakNet::BitStream bstream;
 	if (WriteMessage(bstream, ID_ROOM_LIST_RESPONSE, proto_list)) {
-		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
+		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
 	}
 }
 
@@ -261,13 +261,6 @@ void RakNetServer::CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* pro
 	BIRIBIT_ASSERT(result.second);
 
 	printLog("Created room %d for the app %s.", room->id, room->appid);
-
-	Proto::Room proto_room;
-	PopulateProtoRoom(room, &proto_room);
-	RakNet::BitStream bstream;
-	if (WriteMessage(bstream, ID_ROOM_CREATED, proto_room)) {
-		m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
-	}
 		
 	Proto::RoomJoin proto_join;
 	proto_join.set_id(room->id);
@@ -332,6 +325,8 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 		client->joined_slot = slot;
 		printLog("Client (%d) \"%s\" joins room %d.", client->id, client->name, room->id);
 		something_changed = true;
+
+		RoomChanged(room);
 	}
 
 	if (something_changed)
@@ -340,7 +335,7 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 		PopulateProtoRoomJoin(client, &proto_join);
 		RakNet::BitStream bstream;
 		if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, addr, false);
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
 	}
 }
 
@@ -358,6 +353,7 @@ bool RakNetServer::LeaveRoom(unique<Client>& client)
 		client->joined_slot = 0;
 
 		printLog("Client (%d) \"%s\" leaves room %d.", client->id, client->name, room->id);
+		
 		if (room->joined_clients_count == 0) {
 			std::size_t erased = m_roomAppIdMap[room->appid].erase(room->id);
 			BIRIBIT_ASSERT(erased > 0);
@@ -367,11 +363,30 @@ bool RakNetServer::LeaveRoom(unique<Client>& client)
 			printLog("Room %d is empty. Closing room.", room->id);
 			m_rooms[room->id] = nullptr;
 		}
+		else
+			RoomChanged(room, client->addr);
 
 		return true;
 	}
 
 	return false;
+}
+void RakNetServer::RoomChanged(unique<Room>& room, RakNet::SystemAddress extra_addr_to_notify)
+{
+	Proto::Room proto_room;
+	PopulateProtoRoom(room, &proto_room);
+	RakNet::BitStream bstream;
+	if (WriteMessage(bstream, ID_ROOM_CHANGED, proto_room)) {
+		for (auto it = room->slots.begin(); it != room->slots.end(); it++) {
+			if (*it != Client::UNASSIGNED_ID) {
+				BIRIBIT_ASSERT(m_clients[*it] != nullptr);
+				m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, m_clients[*it]->addr, false);
+			}
+		}
+
+		if (extra_addr_to_notify != RakNet::UNASSIGNED_SYSTEM_ADDRESS)
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, extra_addr_to_notify, false);
+	}
 }
 
 void RakNetServer::PopulateProtoServerInfo(Proto::ServerInfo* proto_info)
@@ -476,7 +491,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		PopulateProtoServerInfo(&proto_info);
 		RakNet::BitStream bstream;
 		if (WriteMessage(bstream, ID_SERVER_INFO_RESPONSE, proto_info))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, p->systemAddress, false);
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, p->systemAddress, false);
 		
 		break;
 	}
@@ -500,7 +515,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 
 		RakNet::BitStream bstream;
 		if (WriteMessage(bstream, ID_SERVER_STATUS_RESPONSE, proto_status))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, p->systemAddress, false);
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, p->systemAddress, false);
 
 		break;
 	}	
@@ -536,8 +551,8 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 			CreateRoom(p->systemAddress, &proto_create);
 		break;
 	}
-	case ID_ROOM_CREATED:
-		BIRIBIT_WARN("Nothing to do with ID_ROOM_CREATED");
+	case ID_ROOM_CHANGED:
+		BIRIBIT_WARN("Nothing to do with ID_ROOM_CHANGED");
 		break;
 	case ID_ROOM_JOIN_REQUEST:
 	{
