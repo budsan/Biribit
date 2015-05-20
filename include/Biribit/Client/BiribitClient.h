@@ -3,11 +3,15 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <memory>
 
 #include <Biribit/BiribitConfig.h>
+#include <Biribit/Packet.h>
 
 namespace Biribit
 {
+
+typedef std::uint32_t TimeMS;
 
 struct API_EXPORT ServerInfo
 {
@@ -64,6 +68,18 @@ struct API_EXPORT Room
 	Room();
 };
 
+struct API_EXPORT Received
+{
+	TimeMS when;
+	ServerConnection::id_t connection;
+	Room::id_t room_id;
+	std::uint8_t slot_id;
+	Packet data;
+
+	Received();
+	Received(Received&&);
+};
+
 class ClientImpl;
 class API_EXPORT Client
 {
@@ -98,6 +114,10 @@ public:
 
 	Room::id_t GetJoinedRoomId(ServerConnection::id_t id);
 	std::uint32_t GetJoinedRoomSlot(ServerConnection::id_t id);
+
+	void SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask = Packet::Unreliable);
+
+	std::unique_ptr<Received> PullReceived();
 
 private:
 	ClientImpl* m_impl;

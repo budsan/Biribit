@@ -56,6 +56,12 @@ enum BiribitMessageIDTypes
 	ID_ROOM_JOIN_REQUEST,
 	//cl -> sv: follows Proto::RoomJoin
 
-	ID_ROOM_JOIN_RESPONSE
+	ID_ROOM_JOIN_RESPONSE,
 	//sv -> cl: follows Proto::RoomJoin
+
+	ID_SEND_BROADCAST_TO_ROOM,
+	//cl -> sv: follows reliability(uin8_t) + binary data
+
+	ID_BROADCAST_FROM_ROOM
+	//sv -> cl: follows sender_slot(uin8_t) + binary data
 };

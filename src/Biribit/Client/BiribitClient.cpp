@@ -10,6 +10,7 @@
 #include <Biribit/Common/Generic.h>
 
 #include <map>
+#include <queue>
 #include <vector>
 #include <array>
 #include <functional>
@@ -58,6 +59,24 @@ ClientParameters::ClientParameters(const std::string& name, const std::string& a
 Room::Room()
 	: id(Room::UNASSIGNED_ID)
 {
+}
+
+Received::Received()
+	: when(0)
+	, connection(ServerConnection::UNASSIGNED_ID)
+	, room_id(Room::UNASSIGNED_ID)
+	, slot_id(0)
+	, data()
+{
+}
+
+Received::Received(Received&& to_move)
+{
+	std::swap(when, to_move.when);
+	std::swap(connection, to_move.connection);
+	std::swap(room_id, to_move.room_id);
+	std::swap(slot_id, to_move.slot_id);
+	data = std::move(to_move.data);
 }
 
 //---------------------------------------------------------------------------//
@@ -172,12 +191,17 @@ public:
 	Room::id_t GetJoinedRoomId(ServerConnection::id_t id);
 	std::uint32_t GetJoinedRoomSlot(ServerConnection::id_t id);
 
+	void SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask = Packet::Unreliable);
+
+	std::unique_ptr<Received> PullReceived();
+
 private: 
 	RakNet::RakPeerInterface *m_peer;
 	unique<TaskPool> m_pool;
 
 	void SendProtocolMessageID(RakNet::MessageID msg, const RakNet::AddressOrGUID systemIdentifier);
 	bool WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, ::google::protobuf::MessageLite& msg);
+	template<typename T> bool ReadMessage(T& msg, RakNet::BitStream& bstream);
 	template<typename T> bool ReadMessage(T& msg, Packet& packet);
 
 	static void RaknetThreadUpdate(RakNet::RakPeerInterface *peer, void* data);
@@ -202,7 +226,11 @@ private:
 
 	std::array<ServerConnectionPriv, CLIENT_MAX_CONNECTIONS+1> m_connections;
 	RefSwap<std::vector<ServerConnection>> connectionsListReq;
+	RakNet::TimeMS m_current;
 	RakNet::TimeMS m_lastDirtyDueTime;
+
+	std::queue<std::unique_ptr<Received>> m_receivedPending;
+	std::mutex m_receivedMutex;
 };
 
 ClientImpl::ClientImpl()
@@ -255,11 +283,13 @@ void ClientImpl::RakNetUpdated()
 {
 	m_pool->enqueue([this]() {
 		RakNet::Packet* p = nullptr;
-		while (m_peer != nullptr && (p = m_peer->Receive()) != nullptr)
+		while (m_peer != nullptr && (p = m_peer->Receive()) != nullptr) {
 			HandlePacket(p);
+			m_peer->DeallocatePacket(p);
+		}
 
-		RakNet::TimeMS current = RakNet::GetTimeMS();
-		if ((current - m_lastDirtyDueTime) > 1000)
+		m_current = RakNet::GetTimeMS();
+		if ((m_current - m_lastDirtyDueTime) > 1000)
 			connectionsListReq.set_dirty();
 	});
 }
@@ -585,6 +615,60 @@ std::uint32_t ClientImpl::GetJoinedRoomSlot(ServerConnection::id_t id)
 	return m_connections[id].joinedSlot;
 }
 
+void ClientImpl::SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	shared<Packet> shared_packet(new Packet());
+	shared_packet->append(packet.getData(), packet.getDataSize());
+
+	PacketReliability reliability;
+	switch (mask)
+	{
+	case Packet::Unreliable:
+		reliability = UNRELIABLE;
+		break;
+	case Packet::Reliable:
+		reliability = RELIABLE;
+		break;
+	case Packet::Ordered:
+	case Packet::ReliableOrdered:
+		reliability = RELIABLE_ORDERED;
+		break;
+	default:
+		reliability = UNRELIABLE;
+		break;
+	}
+
+	m_pool->enqueue([this, id, shared_packet, reliability]()
+	{
+		ServerConnectionPriv& conn = m_connections[id];
+		if (conn.isNull())
+			return;
+
+		RakNet::BitStream bstream;
+		bstream.Write((RakNet::MessageID) ID_SEND_BROADCAST_TO_ROOM);
+		bstream.Write(RakNet::GetTimeMS());
+		bstream.Write((std::uint8_t) reliability);
+
+		const char* data[2] = { (const char*)bstream.GetData(), (const char*)shared_packet->getData() };
+		int lengths[2] = { (int) bstream.GetNumberOfBytesUsed(), (int)shared_packet->getDataSize() };
+		m_peer->SendList(data, lengths, 2, MEDIUM_PRIORITY, reliability, id & 0xFF, conn.addr, false);
+	});
+}
+
+std::unique_ptr<Received> ClientImpl::PullReceived()
+{
+	std::lock_guard<std::mutex> lock(m_receivedMutex);
+	if (m_receivedPending.empty())
+		return nullptr;
+
+	std::unique_ptr<Received> ptr = std::move(m_receivedPending.front());
+	m_receivedPending.pop();
+	return std::move(ptr);
+}
+
 void ClientImpl::SendProtocolMessageID(RakNet::MessageID msg, const RakNet::AddressOrGUID systemIdentifier)
 {
 	Packet tosend; tosend << msg;
@@ -613,21 +697,27 @@ template<typename T> bool ClientImpl::ReadMessage(T& msg, Packet& packet)
 	return msg.ParseFromArray(m_buffer.data, (int) size);
 }
 
+template<typename T> bool ClientImpl::ReadMessage(T& msg, RakNet::BitStream& bstream)
+{
+	std::size_t size = BITS_TO_BYTES(bstream.GetNumberOfUnreadBits());
+	m_buffer.Ensure(size);
+	bstream.Read(m_buffer.data, size);
+	return msg.ParseFromArray(m_buffer.data, size);
+}
+
 void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 {
-	Packet packet;
-	packet.append(static_cast<const void*>(pPacket->data), pPacket->length);
-
+	RakNet::BitStream stream(pPacket->data, pPacket->length, false);
 	RakNet::MessageID packetIdentifier;
 	RakNet::Time timeStamp = 0;
 
-	packet >> packetIdentifier;
+	stream.Read(packetIdentifier);
 	if (packetIdentifier == ID_TIMESTAMP)
 	{
 		RakAssert(pPacket->length > (sizeof(RakNet::MessageID) + sizeof(RakNet::Time)));
-		packet.read(&timeStamp, sizeof(timeStamp));
-		packet >> packetIdentifier;
-	}	
+		stream.Read(timeStamp);
+		stream.Read(packetIdentifier);
+	}
 
 	// Check if this is a network message packet
 	switch (packetIdentifier)
@@ -642,11 +732,11 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		printLog("ID_INCOMPATIBLE_PROTOCOL_VERSION");
 		break;
 	case ID_ADVERTISE_SYSTEM:
-		packet >> packetIdentifier;
+		stream.Read(packetIdentifier);
 		if (ID_SERVER_INFO_RESPONSE)
 		{
 			Proto::ServerInfo proto_info;
-			if (ReadMessage(proto_info, packet))
+			if (ReadMessage(proto_info, stream))
 			{
 				ServerInfoPriv& si = serverList[pPacket->systemAddress];
 				PopulateServerInfo(si, &proto_info);
@@ -658,11 +748,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	{
 		RakNet::TimeMS pingTime;
 		RakNet::TimeMS current = RakNet::GetTimeMS();
-		{
-			std::uint32_t temp;
-			packet >> temp;
-			pingTime = temp;
-		}
+		stream.Read(pingTime);
 
 		ServerInfoPriv& si = serverList[pPacket->systemAddress];
 		si.data.ping = current - pingTime;
@@ -715,7 +801,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	case ID_SERVER_INFO_RESPONSE:
 	{
 		Proto::ServerInfo proto_info;
-		if (ReadMessage(proto_info, packet))
+		if (ReadMessage(proto_info, stream))
 		{
 			ServerInfoPriv& si = serverList[pPacket->systemAddress];
 			PopulateServerInfo(si, &proto_info);
@@ -734,7 +820,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	case ID_CLIENT_SELF_STATUS:
 	{
 		Proto::Client proto_client;
-		if (ReadMessage(proto_client, packet))
+		if (ReadMessage(proto_client, stream))
 			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_SELF_CLIENT);
 		break;
 	}
@@ -744,7 +830,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	case ID_SERVER_STATUS_RESPONSE:
 	{
 		Proto::ServerStatus proto_status;
-		if (ReadMessage(proto_status, packet))
+		if (ReadMessage(proto_status, stream))
 		{
 			ServerInfoPriv& si = serverList[pPacket->systemAddress];
 			BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
@@ -776,14 +862,14 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	case ID_CLIENT_STATUS_UPDATED:
 	{
 		Proto::Client proto_client;
-		if (ReadMessage(proto_client, packet))
+		if (ReadMessage(proto_client, stream))
 			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_REMOTE_CLIENT);
 		break;
 	}
 	case ID_CLIENT_DISCONNECTED:
 	{
 		Proto::Client proto_client;
-		if (ReadMessage(proto_client, packet))
+		if (ReadMessage(proto_client, stream))
 			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_REMOTE_DISCONNECTION);
 		break;
 	}
@@ -793,7 +879,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	case ID_ROOM_LIST_RESPONSE:
 	{
 		Proto::RoomList proto_list;
-		if (ReadMessage(proto_list, packet))
+		if (ReadMessage(proto_list, stream))
 		{
 			ServerInfoPriv& si = serverList[pPacket->systemAddress];
 			BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
@@ -822,7 +908,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	case ID_ROOM_CHANGED:
 	{
 		Proto::Room proto_room;
-		if (ReadMessage(proto_room, packet))
+		if (ReadMessage(proto_room, stream))
 			UpdateRoom(pPacket->systemAddress, &proto_room);
 		break;
 	}
@@ -832,7 +918,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	case ID_ROOM_JOIN_RESPONSE:
 	{
 		Proto::RoomJoin proto_join;
-		if (ReadMessage(proto_join, packet))
+		if (ReadMessage(proto_join, stream))
 		{
 			ServerInfoPriv& si = serverList[pPacket->systemAddress];
 			BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
@@ -846,6 +932,32 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		}
 		break;
 	}
+	case ID_SEND_BROADCAST_TO_ROOM:
+		BIRIBIT_WARN("Nothing to do with ID_SEND_BROADCAST_TO_ROOM");
+		break;
+	case ID_BROADCAST_FROM_ROOM:
+	{
+		ServerInfoPriv& si = serverList[pPacket->systemAddress];
+		if (si.id != ServerConnection::UNASSIGNED_ID)
+		{
+			ServerConnectionPriv& sc = m_connections[si.id];
+
+			std::unique_ptr<Received> recv(new Received);
+			recv->connection = si.id;
+			recv->room_id = sc.joinedRoom;
+			stream.Read(recv->when);
+			stream.Read(recv->slot_id);
+
+			std::size_t size = BITS_TO_BYTES(stream.GetNumberOfUnreadBits());
+			m_buffer.Ensure(size);
+			stream.Read(m_buffer.data, size);
+			recv->data.append(m_buffer.data, size);
+
+			std::lock_guard<std::mutex> lock(m_receivedMutex);
+			m_receivedPending.push(std::move(recv));
+		}
+		break;
+	}	
 	default:
 		printLog("UNKNOWN PACKET IDENTIFIER");
 		break;
@@ -1088,6 +1200,16 @@ Room::id_t Client::GetJoinedRoomId(ServerConnection::id_t id)
 std::uint32_t Client::GetJoinedRoomSlot(ServerConnection::id_t id)
 {
 	return m_impl->GetJoinedRoomSlot(id);
+}
+
+void Client::SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask)
+{
+	m_impl->SendToRoom(id, packet, mask);
+}
+
+std::unique_ptr<Received> Client::PullReceived()
+{
+	return m_impl->PullReceived();
 }
 
 }

@@ -7,6 +7,9 @@
 
 #include <Biribit/BiribitConfig.h>
 
+namespace Biribit
+{
+
 ////////////////////////////////////////////////////////////
 /// \brief Utility class to build blocks of data to transfer
 ///        over the network
@@ -18,6 +21,14 @@ class API_EXPORT Packet
 	typedef bool (Packet::*BoolType)(std::size_t);
 
 public :
+
+	enum ReliabilityBitmask
+	{
+		Unreliable = 0,
+		Reliable = 1,
+		Ordered = 2,
+		ReliableOrdered = 3
+	};
 
 	////////////////////////////////////////////////////////////
 	/// \brief Default constructor
@@ -271,5 +282,7 @@ private :
 	std::size_t       m_readPos; ///< Current reading position in the packet
 	bool              m_isValid; ///< Reading state of the packet
 };
+
+}
 
 #endif //_PACKET_H

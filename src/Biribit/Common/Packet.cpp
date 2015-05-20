@@ -15,6 +15,9 @@
 #include <unistd.h>
 #endif
 
+namespace Biribit
+{
+
 ////////////////////////////////////////////////////////////
 Packet::Packet() :
 m_readPos(0),
@@ -498,3 +501,5 @@ void Packet::onReceive(const void* data, std::size_t size)
 {
 	append(data, size);
 }
+
+} //namespace Biribit
