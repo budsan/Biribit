@@ -253,13 +253,14 @@ private:
 
 			if (ImGui::CollapsingHeader("Chat"))
 			{
-				ImGui::InputText("##chat", chat, sizeof_array(chat)); ImGui::SameLine();
-				if (ImGui::Button("Send"))
+				bool Enter = ImGui::InputText("##chat", chat, sizeof_array(chat), ImGuiInputTextFlags_EnterReturnsTrue); ImGui::SameLine();
+				if (ImGui::Button("Send") || Enter)
 				{
 					Biribit::Packet packet;
 					packet.append(chat, strlen(chat));
 					packet << (char) '\0';
 					client->SendToRoom(connection.id, packet);
+					chat[0] = '\0';
 				}
 
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1));
