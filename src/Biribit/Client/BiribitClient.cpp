@@ -55,6 +55,11 @@ ClientParameters::ClientParameters(const std::string& name, const std::string& a
 {
 }
 
+Room::Room()
+	: id(Room::UNASSIGNED_ID)
+{
+}
+
 //---------------------------------------------------------------------------//
 
 struct ServerInfoPriv
@@ -92,6 +97,7 @@ public:
 	std::uint32_t joinedSlot;
 
 	ServerConnectionPriv();
+
 	bool isNull();
 };
 
@@ -162,6 +168,9 @@ public:
 
 	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id);
 	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::uint32_t slot_id);
+
+	Room::id_t GetJoinedRoomId(ServerConnection::id_t id);
+	std::uint32_t GetJoinedRoomSlot(ServerConnection::id_t id);
 
 private: 
 	RakNet::RakPeerInterface *m_peer;
@@ -560,6 +569,22 @@ void ClientImpl::JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::ui
 	});
 }
 
+Room::id_t ClientImpl::GetJoinedRoomId(ServerConnection::id_t id)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return RemoteClient::UNASSIGNED_ID;
+
+	return m_connections[id].joinedRoom;
+}
+
+std::uint32_t ClientImpl::GetJoinedRoomSlot(ServerConnection::id_t id)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return RemoteClient::UNASSIGNED_ID;
+
+	return m_connections[id].joinedSlot;
+}
+
 void ClientImpl::SendProtocolMessageID(RakNet::MessageID msg, const RakNet::AddressOrGUID systemIdentifier)
 {
 	Packet tosend; tosend << msg;
@@ -812,10 +837,11 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			ServerInfoPriv& si = serverList[pPacket->systemAddress];
 			BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
 			ServerConnectionPriv& sc = m_connections[si.id];
-			if (proto_join.has_id() && proto_join.has_slot_to_join())
+			if (proto_join.has_id())
 			{
 				sc.joinedRoom = proto_join.id();
-				sc.joinedSlot = proto_join.slot_to_join();
+				if (proto_join.has_slot_to_join())
+					sc.joinedSlot = proto_join.slot_to_join();
 			}	
 		}
 		break;
@@ -865,6 +891,17 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 		sc.selfId = RemoteClient::UNASSIGNED_ID;
 		si.id = ServerConnection::UNASSIGNED_ID;
 		connectionsListReq.set_dirty();
+
+		sc.requested = ClientParameters();
+
+		sc.joinedRoom = Room::UNASSIGNED_ID;
+		sc.joinedSlot = 0;
+
+		sc.clients.clear();
+		sc.clientsListReq.set_dirty();
+
+		sc.rooms.clear();
+		sc.roomsListReq.set_dirty();
 	}
 }
 
@@ -942,7 +979,9 @@ void ClientImpl::PopulateRoom(Room& room, const Proto::Room* proto_room)
 
 	int joined_id_client_size = proto_room->joined_id_client_size();
 	room.slots.resize(joined_id_client_size);
-	
+	for (std::size_t i = 0; i < room.slots.size(); i++) {
+		room.slots[i] = proto_room->joined_id_client(i);
+	}
 }
 
 //---------------------------------------------------------------------------//
@@ -1041,5 +1080,14 @@ void Client::JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::uint32
 	m_impl->JoinRoom(id, room_id, slot_id);
 }
 
+Room::id_t Client::GetJoinedRoomId(ServerConnection::id_t id)
+{
+	return m_impl->GetJoinedRoomId(id);
+}
+
+std::uint32_t Client::GetJoinedRoomSlot(ServerConnection::id_t id)
+{
+	return m_impl->GetJoinedRoomSlot(id);
+}
 
 }

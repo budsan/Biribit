@@ -59,6 +59,8 @@ class RakNetServer
 		};
 
 		std::vector<Entry> journal;
+
+		Room();
 	};
 
 	std::vector<unique<Room>> m_rooms;

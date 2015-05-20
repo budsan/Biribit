@@ -26,6 +26,13 @@ RakNetServer::Client::Client()
 {
 }
 
+RakNetServer::Room::Room()
+	: id(Room::UNASSIGNED_ID)
+	, joined_clients_count(0)
+{
+
+}
+
 const char* randomNames[] = {
 	"Arianne", "Kesha", "Minerva",
 	"Dianna", "Daisey", "Edna",
@@ -116,6 +123,10 @@ void RakNetServer::RemoveClient(RakNet::SystemAddress addr)
 	BIRIBIT_ASSERT(it->second < m_clients.size());
 	BIRIBIT_ASSERT(m_clients[it->second] != nullptr);
 
+	Proto::RoomJoin proto_join;
+	proto_join.set_id(0);
+	JoinRoom(addr, &proto_join);
+
 	unique<Client>& client = m_clients[it->second];
 	Proto::Client proto_client;
 	PopulateProtoClient(client, &proto_client);
@@ -149,7 +160,7 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 		std::uint32_t tries = 0;
 		while (!success && tries < 100)
 		{
-			std::string current_name = tries > 0 ? current_name + std::to_string(tries) : name;
+			std::string current_name = tries > 0 ? name + std::to_string(tries) : name;
 			auto itName = m_clientNameMap.find(current_name);
 			if (itName != m_clientNameMap.end())
 			{
@@ -205,7 +216,7 @@ void RakNetServer::ListRooms(RakNet::SystemAddress addr)
 
 	unique<Client>& client = m_clients[itAddr->second];
 	if (client->appid.empty()) {
-		printLog("WARN: Client (%d) \"%s\" can't list rooms without appid.", client->id, client->name);
+		printLog("WARN: Client (%d) \"%s\" can't list rooms without appid.", client->id, client->name.c_str());
 		return;
 	}
 
@@ -235,12 +246,12 @@ void RakNetServer::CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* pro
 
 	unique<Client>& client = m_clients[itAddr->second];
 	if (client->appid.empty()) {
-		printLog("WARN: Client (%d) \"%s\" can't create a room without appid.", client->id, client->name);
+		printLog("WARN: Client (%d) \"%s\" can't create a room without appid.", client->id, client->name.c_str());
 		return;
 	}
 
 	if (!proto_create->has_client_slots() || proto_create->client_slots() == 0) {
-		printLog("WARN: Client (%d) \"%s\" tried to create a room with a wrong slot number.", client->id, client->name);
+		printLog("WARN: Client (%d) \"%s\" tried to create a room with a wrong slot number.", client->id, client->name.c_str());
 		return;
 	}
 
@@ -260,7 +271,7 @@ void RakNetServer::CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* pro
 	auto result = room_set.insert(room->id);
 	BIRIBIT_ASSERT(result.second);
 
-	printLog("Created room %d for the app %s.", room->id, room->appid);
+	printLog("Created room %d for the app %s.", room->id, room->appid.c_str());
 		
 	Proto::RoomJoin proto_join;
 	proto_join.set_id(room->id);
@@ -279,54 +290,82 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 
 	unique<Client>& client = m_clients[itAddr->second];
 	if (!proto_join->has_id()) {
-		printLog("WARN: Client (%d) \"%s\" sent RoomJoin without room id.", client->id, client->name);
+		printLog("WARN: Client (%d) \"%s\" sent RoomJoin without room id.", client->id, client->name.c_str());
 		return;
 	}
-
+	
+	bool something_changed = false;
 	std::uint32_t id = proto_join->id();
-	std::uint32_t slot;
-	if (id != Room::UNASSIGNED_ID)
+	if (id == Room::UNASSIGNED_ID)
 	{
-		if (m_rooms[id] == nullptr) {
-			printLog("WARN: Client (%d) \"%s\" tried to join to unexisting room.", client->id, client->name);
-			return;
-		}
-
-		if (m_rooms[id]->appid != client->appid) {
-			printLog("WARN: Client (%d) \"%s\" tried to join other app's room.", client->id, client->name);
-			return;
-		}
-
-		if (!proto_join->has_slot_to_join())
-		{
-			for (slot = 0; slot < m_rooms[id]->slots.size() && m_rooms[id]->slots[slot] != Client::UNASSIGNED_ID; slot++);
-			if (slot >= m_rooms[id]->slots.size()) {
-				printLog("WARN: Client (%d) \"%s\" tried to join a full room.", client->id, client->name);
-				return;
-			}
-		}
-		else
-		{
-			slot = proto_join->slot_to_join();
-			if (slot >= m_rooms[id]->slots.size() || m_rooms[id]->slots[slot] != Client::UNASSIGNED_ID) {
-				printLog("WARN: Client (%d) \"%s\" tried to join an invalid slot.", client->id, client->name);
-				return;
-			}
-		}
+		//Client just want to leave the room
+		something_changed = LeaveRoom(client);
 	}
-
-	bool something_changed = LeaveRoom(client);
-	if (id != Room::UNASSIGNED_ID)
+	else
 	{
-		unique<Room>& room = m_rooms[id];
-		room->slots[slot] = client->id;
-		room->joined_clients_count++;
-		client->joined_room = id;
-		client->joined_slot = slot;
-		printLog("Client (%d) \"%s\" joins room %d.", client->id, client->name, room->id);
-		something_changed = true;
+		if (id != Room::UNASSIGNED_ID)
+		{
+			if (m_rooms[id] == nullptr) {
+				printLog("WARN: Client (%d) \"%s\" tried to join to unexisting room.", client->id, client->name.c_str());
+				return;
+			}
 
-		RoomChanged(room);
+			if (m_rooms[id]->appid != client->appid) {
+				printLog("WARN: Client (%d) \"%s\" tried to join other app's room.", client->id, client->name.c_str());
+				return;
+			}
+		}
+
+		//Leaving old room, joining new one
+		if (client->joined_room != id)
+		{
+			std::uint32_t slot;
+			unique<Room>& room = m_rooms[id];
+			if (proto_join->has_slot_to_join())
+			{
+				slot = proto_join->slot_to_join();
+				if (slot >= room->slots.size() || room->slots[slot] != Client::UNASSIGNED_ID) {
+					printLog("WARN: Client (%d) \"%s\" tried to join an invalid slot.", client->id, client->name.c_str());
+					return;
+				}
+			}
+			else
+			{
+				for (slot = 0; slot < room->slots.size() && room->slots[slot] != Client::UNASSIGNED_ID; slot++);
+				if (slot >= m_rooms[id]->slots.size()) {
+					printLog("WARN: Client (%d) \"%s\" tried to join a full room.", client->id, client->name.c_str());
+					return;
+				}
+			}
+			
+			LeaveRoom(client);
+			room->slots[slot] = client->id;
+			room->joined_clients_count++;
+			client->joined_room = id;
+			client->joined_slot = slot;
+			printLog("Client (%d) \"%s\" joins room %d.", client->id, client->name.c_str(), room->id);
+			RoomChanged(room);
+			something_changed = true;
+		}
+		else if (proto_join->has_slot_to_join() && client->joined_slot != proto_join->slot_to_join())
+		{
+			//Slot swapping
+			unique<Room>& room = m_rooms[id];
+			std::uint32_t oldslot = client->joined_slot;
+			std::uint32_t slot = proto_join->slot_to_join();
+			if (slot >= room->slots.size() || room->slots[slot] != Client::UNASSIGNED_ID) {
+				printLog("WARN: Client (%d) \"%s\" tried to join an invalid slot.", client->id, client->name.c_str());
+				return;
+			}
+	
+			room->slots[oldslot] = Client::UNASSIGNED_ID;
+			room->slots[slot] = client->id;
+			client->joined_slot = slot;
+
+			printLog("Client (%d) \"%s\" swaps slot from %d to %d in room %d.", client->id, client->name.c_str(), oldslot, slot, room->id);
+			RoomChanged(room);
+			something_changed = true;
+		}
 	}
 
 	if (something_changed)
@@ -352,7 +391,7 @@ bool RakNetServer::LeaveRoom(unique<Client>& client)
 		client->joined_room = Room::UNASSIGNED_ID;
 		client->joined_slot = 0;
 
-		printLog("Client (%d) \"%s\" leaves room %d.", client->id, client->name, room->id);
+		printLog("Client (%d) \"%s\" leaves room %d.", client->id, client->name.c_str(), room->id);
 		
 		if (room->joined_clients_count == 0) {
 			std::size_t erased = m_roomAppIdMap[room->appid].erase(room->id);

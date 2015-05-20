@@ -60,6 +60,8 @@ struct API_EXPORT Room
 
 	id_t id;
 	std::vector<RemoteClient::id_t> slots;
+
+	Room();
 };
 
 class ClientImpl;
@@ -93,6 +95,9 @@ public:
 
 	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id);
 	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::uint32_t slot_id);
+
+	Room::id_t GetJoinedRoomId(ServerConnection::id_t id);
+	std::uint32_t GetJoinedRoomSlot(ServerConnection::id_t id);
 
 private:
 	ClientImpl* m_impl;

@@ -22,6 +22,47 @@ class ClientUpdater : public UpdaterListener
 	Console* console;
 	bool displayed;
 
+	char addr[128];
+	char pass[128];
+	char cname[128];
+	char appid[128];
+
+	int port;
+	int server_listbox_current;
+	int connections_listbox_current;
+	int rooms_listbox_current;
+	int slots;
+	int slots_to_join;
+
+	std::vector<const char*> server_listbox;
+	std::vector<std::string> server_listbox_str;
+
+	std::vector<const char*> connections_listbox;
+	std::vector<std::string> connections_listbox_str;
+
+	std::vector<const char*> rooms_listbox;
+	std::vector<std::string> rooms_listbox_str;
+
+public:
+
+	ClientUpdater()
+		: client(nullptr)
+		, console(nullptr)
+		, port(0)
+		, server_listbox_current(0)
+		, connections_listbox_current(0)
+		, rooms_listbox_current(0)
+		, slots(4)
+		, slots_to_join(0)
+	{
+		strcpy(addr, "localhost");
+		strcpy(pass, "");
+		strcpy(cname, "ClientName");
+		strcpy(appid, "app-client-test");
+	}
+
+private:
+
 	void OnUpdate(float deltaTime) override
 	{
 
@@ -40,98 +81,149 @@ class ClientUpdater : public UpdaterListener
 			return;
 		}
 
-		static char addr[128] = "localhost";
-		static char pass[128] = "";
-		static int port = 0;
-
 		ImGui::InputText("Address", addr, sizeof_array(addr));
 		ImGui::InputInt("Port", &port); 
 		ImGui::InputText("Password", pass, sizeof_array(pass)); ImGui::SameLine();
 		if (ImGui::Button("Connect"))
 			client->Connect(addr, port, (pass[0] != '\0') ? pass : nullptr);
 
-		if (ImGui::Button("Discover in LAN"))
-			client->DiscoverOnLan();
-
-		if (ImGui::Button("Clear list of servers"))
-			client->ClearDiscoverInfo();
-
-		if (ImGui::Button("Refresh servers"))
-			client->RefreshDiscoverInfo();
-
-		ImGui::PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 5.0f);	
-		std::vector<const char*> server_listbox;
-		std::vector<std::string> server_listbox_str;
-		const std::vector<Biribit::ServerInfo>& info = client->GetDiscoverInfo();
-
-		for (auto it = info.begin(); it != info.end(); it++)
-			server_listbox_str.push_back(it->name + ", ping " + std::to_string(it->ping) + (it->passwordProtected ? ". Password protected." : ". No password."));
-			
-		for (auto it = server_listbox_str.begin(); it != server_listbox_str.end(); it++)
-			server_listbox.push_back(it->c_str());
-
-		static int server_listbox_current = 1;
-		if (!server_listbox.empty())
+		if (ImGui::CollapsingHeader("Servers"))
 		{
-			if (server_listbox_current >= server_listbox.size())
-				server_listbox_current = 0;
 
-			ImGui::ListBox("Servers", &server_listbox_current, &server_listbox[0], server_listbox.size(), 4);
+			if (ImGui::Button("Discover in LAN"))
+				client->DiscoverOnLan();
 
-			if (ImGui::Button("Connect selected"))
+			ImGui::SameLine();
+			if (ImGui::Button("Clear list of servers"))
+				client->ClearDiscoverInfo();
+
+			ImGui::SameLine();
+			if (ImGui::Button("Refresh servers"))
+				client->RefreshDiscoverInfo();
+
+			const std::vector<Biribit::ServerInfo>& discover_info = client->GetDiscoverInfo();
+			server_listbox.clear();
+			server_listbox_str.clear();
+			for (auto it = discover_info.begin(); it != discover_info.end(); it++)
+				server_listbox_str.push_back(it->name + ", ping " + std::to_string(it->ping) + (it->passwordProtected ? ". Password protected." : ". No password."));
+
+			for (auto it = server_listbox_str.begin(); it != server_listbox_str.end(); it++)
+				server_listbox.push_back(it->c_str());
+
+			if (!server_listbox.empty())
 			{
-				const Biribit::ServerInfo& serverInfo = info[server_listbox_current];
-				client->Connect(serverInfo.addr.c_str(), serverInfo.port);
+				if (server_listbox_current >= server_listbox.size())
+					server_listbox_current = 0;
+
+				ImGui::ListBox("Servers", &server_listbox_current, &server_listbox[0], server_listbox.size(), 4);
+
+				if (ImGui::Button("Connect selected"))
+				{
+					const Biribit::ServerInfo& serverInfo = discover_info[server_listbox_current];
+					client->Connect(serverInfo.addr.c_str(), serverInfo.port);
+				}
 			}
 		}
 
-		std::vector<const char*> connections_listbox;
-		std::vector<std::string> connections_listbox_str;
 		const std::vector<Biribit::ServerConnection>& conns = client->GetConnections();
-
+		connections_listbox.clear();
+		connections_listbox_str.clear();
 		for (auto it = conns.begin(); it != conns.end(); it++)
 			connections_listbox_str.push_back(std::to_string(it->id) + ": " + it->name + ". Ping: " + std::to_string(it->ping));
 
 		for (auto it = connections_listbox_str.begin(); it != connections_listbox_str.end(); it++)
 			connections_listbox.push_back(it->c_str());
 
-		static int connections_listbox_current = 0;
+		
 		if (!connections_listbox.empty())
 		{
 			if (connections_listbox_current >= connections_listbox.size())
 				connections_listbox_current = 0;
 
+			const Biribit::ServerConnection& connection = conns[connections_listbox_current];
 			ImGui::ListBox("Connections", &connections_listbox_current, &connections_listbox[0], connections_listbox.size(), 4);
-			if (ImGui::Button("Disconnect selected"))
-			{
-				const Biribit::ServerConnection& connection = conns[connections_listbox_current];
+			if (ImGui::Button("Disconnect"))
 				client->Disconnect(connection.id);
-			}
 
+			ImGui::SameLine();
 			if (ImGui::Button("Disconnect all"))
 				client->Disconnect();
 
-			static char cname[128] = "ClientName";
-			static char appid[128] = "app-client-test";
-
 			ImGui::InputText("Client name", cname, sizeof_array(cname));
 			ImGui::InputText("Application Id", appid, sizeof_array(appid));
-			if (ImGui::Button("Set on selected connection"))
-				client->SetLocalClientParameters(conns[connections_listbox_current].id, Biribit::ClientParameters(cname, appid));
+			if (ImGui::Button("Set name and appid"))
+				client->SetLocalClientParameters(connection.id, Biribit::ClientParameters(cname, appid));
 
 			ImGui::LabelText("##ClientsLabel", "Connected clients");
 			ImGui::Separator();
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1));
-			const std::vector<Biribit::RemoteClient>& clients = client->GetRemoteClients(conns[connections_listbox_current].id);
-			Biribit::RemoteClient::id_t selfId = client->GetLocalClientId(conns[connections_listbox_current].id);
+			const std::vector<Biribit::RemoteClient>& clients = client->GetRemoteClients(connection.id);
+			std::map<Biribit::RemoteClient::id_t, std::vector<Biribit::RemoteClient>::const_iterator> idToClient;
+			Biribit::RemoteClient::id_t selfId = client->GetLocalClientId(connection.id);
 			for (auto it = clients.begin(); it != clients.end(); it++) {
+				idToClient[it->id] = it;
 				std::string item = std::to_string(it->id) + ": " + it->name + ( (it->id == selfId) ? " (YOU)" : "");
 				ImGui::TextUnformatted(item.c_str());
 			}
 			ImGui::PopStyleVar();
-		}
+			ImGui::Separator();
 
-		ImGui::PopStyleVar();
+			ImGui::InputInt("Slots", &slots); ImGui::SameLine();
+			if (ImGui::Button("Create"))
+				client->CreateRoom(connection.id, slots);
+			
+			ImGui::InputInt("Joining slot", &slots_to_join); ImGui::SameLine();
+			if (ImGui::Button("& Join"))
+				client->CreateRoom(connection.id, slots, slots_to_join);
+
+			const std::vector<Biribit::Room>& rooms = client->GetRooms(connection.id);
+			Biribit::Room::id_t joined = client->GetJoinedRoomId(connection.id);
+			std::uint32_t slot = client->GetJoinedRoomSlot(connection.id);
+			rooms_listbox.clear();
+			rooms_listbox_str.clear();
+			for (auto it = rooms.begin(); it != rooms.end(); it++) {
+				std::stringstream ss;
+				ss << "Room " << it->id << ". Slots: ";
+				for (std::size_t i = 0; i < it->slots.size(); i++)
+					ss << "(" << ((it->slots[i] == Biribit::RemoteClient::UNASSIGNED_ID) ? "Free" : idToClient[it->slots[i]]->name) << ") ";
+
+				if (it->id == joined)
+					ss << "Joined: " << slot;
+
+				rooms_listbox_str.push_back(ss.str());
+			}
+				
+
+			for (auto it = rooms_listbox_str.begin(); it != rooms_listbox_str.end(); it++)
+				rooms_listbox.push_back(it->c_str());
+
+			if (!rooms_listbox.empty())
+			{
+				if (rooms_listbox_current >= rooms_listbox.size())
+					rooms_listbox_current = 0;
+
+				ImGui::ListBox("Rooms", &rooms_listbox_current, &rooms_listbox[0], rooms_listbox.size(), 4);
+				if (ImGui::Button("Refresh rooms"))
+					client->RefreshRooms(connection.id);
+
+				ImGui::SameLine();
+				if (ImGui::Button("Join"))
+					client->JoinRoom(connection.id, rooms[rooms_listbox_current].id);
+
+				ImGui::SameLine();
+				if (ImGui::Button("Leave"))
+					client->JoinRoom(connection.id, 0);
+
+				ImGui::InputInt("Slot", &slots_to_join); ImGui::SameLine();
+				if (ImGui::Button("Join slot"))
+					client->JoinRoom(connection.id, rooms[rooms_listbox_current].id, slots_to_join);
+			}
+			else
+			{
+				if (ImGui::Button("Refresh rooms"))
+					client->RefreshRooms(connection.id);
+			}
+		}
 
 		ImGui::End();
 	}
@@ -142,11 +234,6 @@ class ClientUpdater : public UpdaterListener
 	}
 
 public:
-
-	ClientUpdater() : client(nullptr), console(nullptr)
-	{
-
-	}
 
 	void SetConsole(Console* _console) {
 		console = _console;
