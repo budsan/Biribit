@@ -62,11 +62,11 @@ void ConsoleInterface::OnGUI()
 	ImGui::EndChild();
 	ImGui::Separator();
 
-	str0 = editing();
-	str0.reserve(128);
+	static char str0[128];
+	strcpy(str0, editing().c_str());
 
-	bool Enter = ImGui::InputText("##Input", &str0[0], str0.capacity(), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory, &TextEditCallbackStub, (void*)this);
-	setEditing(str0.c_str());
+	bool Enter = ImGui::InputText("##Input", str0, 128, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory, &TextEditCallbackStub, (void*)this);
+	setEditing(str0);
 	if (Enter) {
 		executeCurrentCommand();
 		scrolldown = true;
