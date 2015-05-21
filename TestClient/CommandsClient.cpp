@@ -246,6 +246,7 @@ private:
 				}
 				else
 				{
+				
 					if (ImGui::Button("Refresh rooms"))
 						client->RefreshRooms(connection.id);
 				}

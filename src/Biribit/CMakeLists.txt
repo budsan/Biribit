@@ -9,6 +9,7 @@ include_directories(
 add_subdirectory(ProtoMessages)
 add_subdirectory(Common)
 add_subdirectory(Client)
+add_subdirectory(Unity)
 
 if (BIRIBIT_BUILD_SERVER)
     add_subdirectory(Server)
