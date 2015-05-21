@@ -648,8 +648,9 @@ void ClientImpl::SendToRoom(ServerConnection::id_t id, const Packet& packet, Pac
 			return;
 
 		RakNet::BitStream bstream;
+		bstream.Write((RakNet::MessageID) ID_TIMESTAMP);
+		bstream.Write(RakNet::GetTime());
 		bstream.Write((RakNet::MessageID) ID_SEND_BROADCAST_TO_ROOM);
-		bstream.Write(RakNet::GetTimeMS());
 		bstream.Write((std::uint8_t) reliability);
 
 		const char* data[2] = { (const char*)bstream.GetData(), (const char*)shared_packet->getData() };
@@ -941,12 +942,13 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		if (si.id != ServerConnection::UNASSIGNED_ID)
 		{
 			ServerConnectionPriv& sc = m_connections[si.id];
-
 			std::unique_ptr<Received> recv(new Received);
 			recv->connection = si.id;
 			recv->room_id = sc.joinedRoom;
-			stream.Read(recv->when);
 			stream.Read(recv->slot_id);
+
+			if (timeStamp != 0)
+				recv->when = timeStamp;
 
 			std::size_t size = BITS_TO_BYTES(stream.GetNumberOfUnreadBits());
 			m_buffer.Ensure(size);

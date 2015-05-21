@@ -423,7 +423,7 @@ void RakNetServer::RoomChanged(unique<Room>& room, RakNet::SystemAddress extra_a
 	}
 }
 
-void RakNetServer::SendRoomBroadcast(RakNet::SystemAddress addr, RakNet::BitStream& in)
+void RakNetServer::SendRoomBroadcast(RakNet::SystemAddress addr, RakNet::Time timeStamp, RakNet::BitStream& in)
 {
 	unique<Client>& client = GetClient(addr);
 	if (client->joined_room > 0)
@@ -432,16 +432,19 @@ void RakNetServer::SendRoomBroadcast(RakNet::SystemAddress addr, RakNet::BitStre
 		BIRIBIT_ASSERT(m_rooms[client->joined_room]->slots[client->joined_slot] == client->id);
 		unique<Room>& room = m_rooms[client->joined_room];
 
-		RakNet::TimeMS timeStamp;
-		in.Read(timeStamp);
 
 		std::uint8_t uint8_reliability;
 		in.Read(uint8_reliability);
 		PacketReliability reliability = (PacketReliability) uint8_reliability;
 
 		RakNet::BitStream bstream;
+		if (timeStamp != 0)
+		{
+			bstream.Write((RakNet::MessageID) ID_TIMESTAMP);
+			bstream.Write(timeStamp);
+		}
+		
 		bstream.Write((RakNet::MessageID) ID_BROADCAST_FROM_ROOM);
-		bstream.Write(timeStamp);
 		bstream.Write((std::uint8_t) client->joined_slot);
 		bstream.Write(in);
 
@@ -632,7 +635,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		BIRIBIT_WARN("Nothing to do with ID_ROOM_JOIN_RESPONSE");
 		break;
 	case ID_SEND_BROADCAST_TO_ROOM:
-		SendRoomBroadcast(p->systemAddress, stream);
+		SendRoomBroadcast(p->systemAddress, timeStamp, stream);
 		break;
 	case ID_BROADCAST_FROM_ROOM:
 		BIRIBIT_WARN("Nothing to do with ID_BROADCAST_FROM_ROOM");

@@ -79,7 +79,7 @@ class RakNetServer
 	bool LeaveRoom(unique<Client>& client);
 	void RoomChanged(unique<Room>& room, RakNet::SystemAddress extra_addr_to_notify = RakNet::UNASSIGNED_SYSTEM_ADDRESS);
 
-	void SendRoomBroadcast(RakNet::SystemAddress addr, RakNet::BitStream& in);
+	void SendRoomBroadcast(RakNet::SystemAddress addr, RakNet::Time timeStamp, RakNet::BitStream& in);
 
 	void PopulateProtoServerInfo(Proto::ServerInfo* proto_info);
 	void PopulateProtoClient(unique<Client>& client, Proto::Client* proto_client);
