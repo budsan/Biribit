@@ -32,77 +32,167 @@ BOOL WINAPI ConsoleHandlerRoutine(DWORD dwCtrlType)
 #ifdef SYSTEM_LINUX
 
 // Found here:
-// http://stackoverflow.com/questions/17954432/creating-a-daemon-in-linux
+// http://www.4pmp.com/2009/12/a-simple-daemon-in-c/
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <signal.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <syslog.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
 
-static void skeleton_daemon()
+#define DAEMON_NAME "BiribitServer"
+
+void daemonShutdown();
+void signal_handler(int sig);
+void daemonize(char *rundir, char *pidfile);
+
+int pidFilehandle;
+void signal_handler(int sig)
 {
-	pid_t pid;
-
-	/* Fork off the parent process */
-	pid = fork();
-
-	/* An error occurred */
-	if (pid < 0)
-		exit(EXIT_FAILURE);
-
-	/* Success: Let the parent terminate */
-	if (pid > 0)
-		exit(EXIT_SUCCESS);
-
-	/* On success: The child process becomes session leader */
-	if (setsid() < 0)
-		exit(EXIT_FAILURE);
-
-	/* Catch, ignore and handle signals */
-	//TODO: Implement a working signal handler */
-	signal(SIGCHLD, SIG_IGN);
-	signal(SIGHUP, SIG_IGN);
-
-	/* Fork off for the second time*/
-	pid = fork();
-
-	/* An error occurred */
-	if (pid < 0)
-		exit(EXIT_FAILURE);
-
-	/* Success: Let the parent terminate */
-	if (pid > 0)
-		exit(EXIT_SUCCESS);
-
-	/* Set new file permissions */
-	umask(0);
-
-	/* Change the working directory to the root directory */
-	/* or another appropriated directory */
-	chdir("/");
-
-	/* Close all open file descriptors */
-	int x;
-	for (x = sysconf(_SC_OPEN_MAX); x>0; x--)
+	switch (sig)
 	{
-		close(x);
+	case SIGHUP:
+		syslog(LOG_WARNING, "Received SIGHUP signal.");
+		break;
+	case SIGINT:
+	case SIGTERM:
+		server.Close();
+		break;
+	default:
+		syslog(LOG_WARNING, "Unhandled signal %s", strsignal(sig));
+		break;
+	}
+}
+
+void daemonShutdown()
+{
+	Log_DelCallback(PrintDaemonLog);
+	close(pidFilehandle);
+	closelog();
+}
+
+void daemonize(char *rundir, char *pidfile)
+{
+	int pid, sid, i;
+	char str[10];
+	struct sigaction newSigAction;
+	sigset_t newSigSet;
+
+	/* Check if parent process id is set */
+	if (getppid() == 1)
+	{
+		/* PPID exists, therefore we are already a daemon */
+		return;
 	}
 
-	/* Open the log file */
-	openlog("BiribitServer", LOG_PID, LOG_DAEMON);
+	/* Set signal mask - signals we want to block */
+	sigemptyset(&newSigSet);
+	sigaddset(&newSigSet, SIGCHLD);  /* ignore child - i.e. we don't need to wait for it */
+	sigaddset(&newSigSet, SIGTSTP);  /* ignore Tty stop signals */
+	sigaddset(&newSigSet, SIGTTOU);  /* ignore Tty background writes */
+	sigaddset(&newSigSet, SIGTTIN);  /* ignore Tty background reads */
+	sigprocmask(SIG_BLOCK, &newSigSet, NULL);   /* Block the above specified signals */
+
+	/* Set up a signal handler */
+	newSigAction.sa_handler = signal_handler;
+	sigemptyset(&newSigAction.sa_mask);
+	newSigAction.sa_flags = 0;
+
+	/* Signals to handle */
+	sigaction(SIGHUP, &newSigAction, NULL);     /* catch hangup signal */
+	sigaction(SIGTERM, &newSigAction, NULL);    /* catch term signal */
+	sigaction(SIGINT, &newSigAction, NULL);     /* catch interrupt signal */
+
+
+	/* Fork*/
+	pid = fork();
+
+	if (pid < 0)
+	{
+		/* Could not fork */
+		exit(EXIT_FAILURE);
+	}
+
+	if (pid > 0)
+	{
+		/* Child created ok, so exit parent process */
+		printf("Child process created: %d\n", pid);
+		exit(EXIT_SUCCESS);
+	}
+
+	/* Child continues */
+
+	umask(027); /* Set file permissions 750 */
+
+	/* Get a new process group */
+	sid = setsid();
+
+	if (sid < 0)
+	{
+		exit(EXIT_FAILURE);
+	}
+
+	/* close all descriptors */
+	for (i = getdtablesize(); i >= 0; --i)
+	{
+		close(i);
+	}
+
+	/* Route I/O connections */
+	openlog(DAEMON_NAME, LOG_PID, LOG_DAEMON);
+
+	/* Open STDIN */
+	i = open("/dev/null", O_RDWR);
+
+	/* STDOUT */
+	dup(i);
+
+	/* STDERR */
+	dup(i);
+
+	chdir(rundir); /* change running directory */
+
+	/* Ensure only one copy */
+	pidFilehandle = open(pidfile, O_RDWR | O_CREAT, 0600);
+
+	if (pidFilehandle == -1)
+	{
+		/* Couldn't open lock file */
+		syslog(LOG_INFO, "Could not open PID lock file %s, exiting", pidfile);
+		exit(EXIT_FAILURE);
+	}
+
+	/* Try to lock file */
+	if (lockf(pidFilehandle, F_TLOCK, 0) == -1)
+	{
+		/* Couldn't get lock on lock file */
+		syslog(LOG_INFO, "Could not lock PID lock file %s, exiting", pidfile);
+		exit(EXIT_FAILURE);
+	}
+
+
+	/* Get and format PID */
+	sprintf(str, "%d\n", getpid());
+
+	/* write pid to lockfile */
+	write(pidFilehandle, str, strlen(str));
 }
 
-void STDCALL PrintDaemonLog(const char* msg)
+class Daemon
 {
-	syslog(LOG_NOTICE, msg);
-}
+public:
+	Daemon(char* rundir, char* pidfile)
+	{
+		daemonize(rundir, pidfile);
+	}
 
-void TerminationHandler(int signum)
-{
-	server.Close();
+	~Daemon()
+	{
+		daemonShutdown();
+	}
 }
 
 #endif
@@ -113,37 +203,37 @@ int main(int argc, char** argv)
 	BOOL ret = SetConsoleCtrlHandler(ConsoleHandlerRoutine, TRUE);
 #endif
 
-#ifdef SYSTEM_LINUX
-	if (signal(SIGINT, TerminationHandler) == SIG_IGN)
-		signal(SIGINT, SIG_IGN);
-	if (signal(SIGHUP, TerminationHandler) == SIG_IGN)
-		signal(SIGHUP, SIG_IGN);
-	if (signal(SIGTERM, TerminationHandler) == SIG_IGN)
-		signal(SIGTERM, SIG_IGN);
-
-	skeleton_daemon();
-	Log_AddCallback(PrintDaemonLog);
-#endif
-
-	
-
 	try
 	{
 		TCLAP::CmdLine cmd("Biribit server", ' ', "0.1");
 
 		TCLAP::ValueArg<std::string> nameArg0("n", "name", "Server name shown", false, "", "name");
-		TCLAP::ValueArg<std::string> nameArg1("p", "port", "Port to bind", false, "", "port");
-		TCLAP::ValueArg<std::string> nameArg2("w", "password", "Server password", false, "", "password");
-
 		cmd.add(nameArg0);
+
+		TCLAP::ValueArg<std::string> nameArg1("p", "port", "Port to bind", false, "", "port");
 		cmd.add(nameArg1);
+
+		TCLAP::ValueArg<std::string> nameArg2("w", "password", "Server password", false, "", "password");
 		cmd.add(nameArg2);
+
+#ifdef SYSTEM_LINUX
+		TCLAP::ValueArg<std::string> nameArgPID("i", "pidfile", "PID File", false, "", "pid");
+		cmd.add(nameArgPID);
+#endif
+		
 		cmd.parse(argc, argv);
 
 		// Get the value parsed by each arg. 
 		std::string name = nameArg0.getValue();
 		std::string port = nameArg1.getValue();
 		std::string pass = nameArg2.getValue();
+
+#ifdef SYSTEM_LINUX
+		std::string pidfile = nameArgPID.getValue();
+		std::unique_ptr<Daemon> daemon;
+		if (!pidfile.empty())
+			daemon = std::unique_ptr<Daemon>(new Daemon("/tmp/", pidfile.c_str()));
+#endif
 
 		int iPort = 0;
 		std::stringstream ssPort(port);
@@ -162,11 +252,6 @@ int main(int argc, char** argv)
 	{
 		std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
 	}
-
-#ifdef SYSTEM_LINUX
-	Log_DelCallback(PrintDaemonLog);
-	closelog();
-#endif
 
 	return 0;
 }
