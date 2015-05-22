@@ -69,16 +69,16 @@ void signal_handler(int sig)
 	}
 }
 
+void STDCALL PrintDaemonLog(const char* msg)
+{
+	syslog(LOG_NOTICE, msg);
+}
+
 void daemonShutdown()
 {
 	Log_DelCallback(PrintDaemonLog);
 	close(pidFilehandle);
 	closelog();
-}
-
-void STDCALL PrintDaemonLog(const char* msg)
-{
-	syslog(LOG_NOTICE, msg);
 }
 
 void daemonize(const char *rundir, const char *pidfile)
