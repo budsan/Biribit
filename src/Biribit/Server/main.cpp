@@ -97,7 +97,7 @@ static void skeleton_daemon()
 
 void STDCALL PrintDaemonLog(const char* msg)
 {
-	syslog(LOG_NOTICE, "First daemon started.");
+	syslog(LOG_NOTICE, msg);
 }
 
 void TerminationHandler(int signum)
