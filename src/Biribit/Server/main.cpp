@@ -42,6 +42,8 @@ BOOL WINAPI ConsoleHandlerRoutine(DWORD dwCtrlType)
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define DAEMON_NAME "BiribitServer"
 
@@ -72,6 +74,11 @@ void daemonShutdown()
 	Log_DelCallback(PrintDaemonLog);
 	close(pidFilehandle);
 	closelog();
+}
+
+void STDCALL PrintDaemonLog(const char* msg)
+{
+	syslog(LOG_NOTICE, msg);
 }
 
 void daemonize(const char *rundir, const char *pidfile)
@@ -193,7 +200,7 @@ public:
 	{
 		daemonShutdown();
 	}
-}
+};
 
 #endif
 
