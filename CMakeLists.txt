@@ -53,6 +53,8 @@ else()
     set(BIRIBIT_BUILD_TEST FALSE)
 endif()
 
+sys_set_option(BIRIBIT_BUILD_CLIENT TRUE BOOL "TRUE to build the Biribit Client, FALSE to do not")
+
 # Android options
 if(SYS_OS_ANDROID)
     # make sure there's the android library available
@@ -133,6 +135,6 @@ SET(BIRIBIT_RAKNET_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/RakNet/RakNet/Source
 add_subdirectory(RakNet)
 add_subdirectory(src/Biribit)
 
-if(BIRIBIT_BUILD_TEST) 
+if(BIRIBIT_BUILD_CLIENT AND BIRIBIT_BUILD_TEST) 
 	add_subdirectory(TestClient)
 endif()

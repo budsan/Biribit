@@ -6,6 +6,8 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <chrono>
+#include <thread>
 
 #include <tclap/CmdLine.h>
 
@@ -76,11 +78,7 @@ int main(int argc, char** argv)
 		{
 			char c;
 			while (server.isRunning() && std::cin >> c)
-			{
-				if (c == 'q') {
-					break;
-				}
-			}
+				std::this_thread::sleep_for(std::chrono::seconds(1));
 
 			server.Close();
 		}

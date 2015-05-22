@@ -193,6 +193,7 @@ public:
 
 	void SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask = Packet::Unreliable);
 
+	std::size_t GetDataSizeOfNextReceived();
 	std::unique_ptr<Received> PullReceived();
 
 private: 
@@ -657,6 +658,15 @@ void ClientImpl::SendToRoom(ServerConnection::id_t id, const Packet& packet, Pac
 		int lengths[2] = { (int) bstream.GetNumberOfBytesUsed(), (int)shared_packet->getDataSize() };
 		m_peer->SendList(data, lengths, 2, MEDIUM_PRIORITY, reliability, id & 0xFF, conn.addr, false);
 	});
+}
+
+std::size_t ClientImpl::GetDataSizeOfNextReceived()
+{
+	std::lock_guard<std::mutex> lock(m_receivedMutex);
+	if (m_receivedPending.empty())
+		return 0;
+
+	return m_receivedPending.front()->data.getDataSize();
 }
 
 std::unique_ptr<Received> ClientImpl::PullReceived()
@@ -1207,6 +1217,11 @@ std::uint32_t Client::GetJoinedRoomSlot(ServerConnection::id_t id)
 void Client::SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask)
 {
 	m_impl->SendToRoom(id, packet, mask);
+}
+
+std::size_t Client::GetDataSizeOfNextReceived()
+{
+	return m_impl->GetDataSizeOfNextReceived();
 }
 
 std::unique_ptr<Received> Client::PullReceived()

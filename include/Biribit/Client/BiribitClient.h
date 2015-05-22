@@ -117,6 +117,7 @@ public:
 
 	void SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask = Packet::Unreliable);
 
+	std::size_t GetDataSizeOfNextReceived();
 	std::unique_ptr<Received> PullReceived();
 
 private:

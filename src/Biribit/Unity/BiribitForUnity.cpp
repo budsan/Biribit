@@ -2,6 +2,7 @@
 #include <Biribit/Common/PrintLog.h>
 #include <Biribit/Client.h>
 
+#include <algorithm>
 #include <memory>
 #include <cstdarg>
 #include <chrono>
@@ -97,9 +98,25 @@ void BiribitForUnity_SendToRoom(const char* data, int length, int reliability)
 
 }
 
-void BiribitForUnity_PullReceived(const char* data, int length, int reliability)
+int BiribitForUnity_GetDataSizeOfNextReceived()
 {
+	std::shared_ptr<Biribit::Client>& client = BiribitForUnity_GetClient();
+	return (int) client->GetDataSizeOfNextReceived();
+}
 
+int BiribitForUnity_PullReceived(void* data, int length, int* slot_id)
+{
+	std::shared_ptr<Biribit::Client>& client = BiribitForUnity_GetClient();
+	std::unique_ptr<Biribit::Received> recv = client->PullReceived();
+	if (recv == nullptr)
+		return 0;
+
+	int size = std::min(length, (int)recv->data.getDataSize());
+	memcpy(data, recv->data.getData(), size);
+	if (slot_id != nullptr)
+		*slot_id = recv->slot_id;
+
+	return size;
 }
 
 void BiribitForUnity_Update()
