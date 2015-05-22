@@ -74,7 +74,7 @@ void daemonShutdown()
 	closelog();
 }
 
-void daemonize(char *rundir, char *pidfile)
+void daemonize(const char *rundir, const char *pidfile)
 {
 	int pid, sid, i;
 	char str[10];
@@ -184,7 +184,7 @@ void daemonize(char *rundir, char *pidfile)
 class Daemon
 {
 public:
-	Daemon(char* rundir, char* pidfile)
+	Daemon(const char* rundir, const char* pidfile)
 	{
 		daemonize(rundir, pidfile);
 	}
