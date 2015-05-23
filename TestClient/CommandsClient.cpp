@@ -6,7 +6,6 @@
 #include <iostream>
 
 #include <Biribit/Client.h>
-#include <Biribit/Unity/BiribitForUnity.h>
 
 #ifdef ENABLE_IMGUI
 #include "imgui.h"
@@ -71,8 +70,6 @@ private:
 	{
 		if (client == nullptr)
 			return;
-
-		BiribitForUnity_Update();
 
 		std::unique_ptr<Biribit::Received> recv;
 		while ((recv = client->PullReceived()) != nullptr)
@@ -295,7 +292,7 @@ public:
 	std::shared_ptr<Biribit::Client> GetClient()
 	{
 		if (client == nullptr)
-			client = BiribitForUnity_GetClient();
+			client = std::shared_ptr<Biribit::Client>(new Biribit::Client());
 
 		return client;
 	}
@@ -308,32 +305,6 @@ void STDCALL LogCallback(const char* msg)
 {
 	if (updater.GetConsole() != nullptr)
 		updater.GetConsole()->print(msg);
-}
-
-bool command_connect(std::stringstream &in, std::stringstream &out, void*)
-{
-	std::string clientname;
-	std::string appid;
-	if (!(in >> clientname))
-	{
-		out << "USAGE: connect clientname appid";
-		return false;
-	}
-
-	if (!(in >> appid))
-	{
-		out << "USAGE: connect clientname appid";
-		return false;
-	}
-
-	BiribitForUnity_Connect(clientname.c_str(), appid.c_str());
-	return true;
-}
-
-bool command_disconnect(std::stringstream &in, std::stringstream &out, void*)
-{
-	BiribitForUnity_Disconnect();
-	return true;
 }
 
 bool command_lookforservers(std::stringstream &in, std::stringstream &out, void*)
@@ -357,8 +328,6 @@ class ClientCommands : public CommandHandler
 	void AddCommands(Console &console, Updater& updater) override
 	{
 		console.addCommand(Console::Command("lookforservers", Client::command_lookforservers, nullptr));
-		console.addCommand(Console::Command("connect", Client::command_connect, nullptr));
-		console.addCommand(Console::Command("disconnect", Client::command_disconnect, nullptr));
 		updater.AddUpdaterListener(&Client::updater);
 	}
 

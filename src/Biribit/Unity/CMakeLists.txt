@@ -6,4 +6,5 @@ add_library(BiribitForUnity SHARED
 
 target_link_libraries(BiribitForUnity
 	BiribitClient
+	BiribitCommon
 )

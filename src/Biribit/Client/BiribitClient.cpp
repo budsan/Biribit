@@ -172,15 +172,15 @@ public:
 	void DiscoverOnLan(unsigned short port);
 	void ClearDiscoverInfo();
 	void RefreshDiscoverInfo();
-	const std::vector<ServerInfo>& GetDiscoverInfo();
-	const std::vector<ServerConnection>& GetConnections();
-	const std::vector<RemoteClient>& GetRemoteClients(ServerConnection::id_t id);
+	const std::vector<ServerInfo>& GetDiscoverInfo(std::uint32_t* revision);
+	const std::vector<ServerConnection>& GetConnections(std::uint32_t* revision);
+	const std::vector<RemoteClient>& GetRemoteClients(ServerConnection::id_t id, std::uint32_t* revision);
 
 	RemoteClient::id_t GetLocalClientId(ServerConnection::id_t id);
 	void SetLocalClientParameters(ServerConnection::id_t id, const ClientParameters& parameters);
 
 	void RefreshRooms(ServerConnection::id_t id);
-	const std::vector<Room>& GetRooms(ServerConnection::id_t id);
+	const std::vector<Room>& GetRooms(ServerConnection::id_t id, std::uint32_t* revision);
 
 	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots);
 	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id);
@@ -191,7 +191,8 @@ public:
 	Room::id_t GetJoinedRoomId(ServerConnection::id_t id);
 	std::uint32_t GetJoinedRoomSlot(ServerConnection::id_t id);
 
-	void SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask = Packet::Unreliable);
+	void SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask);
+	void SendToRoom(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask);
 
 	std::size_t GetDataSizeOfNextReceived();
 	std::unique_ptr<Received> PullReceived();
@@ -199,6 +200,8 @@ public:
 private: 
 	RakNet::RakPeerInterface *m_peer;
 	unique<TaskPool> m_pool;
+
+	void SendToRoom(ServerConnection::id_t id, shared<Packet> packet, Packet::ReliabilityBitmask mask);
 
 	void SendProtocolMessageID(RakNet::MessageID msg, const RakNet::AddressOrGUID systemIdentifier);
 	bool WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, ::google::protobuf::MessageLite& msg);
@@ -375,7 +378,7 @@ void ClientImpl::ClearDiscoverInfo()
 	});
 }
 
-const std::vector<ServerInfo>& ClientImpl::GetDiscoverInfo()
+const std::vector<ServerInfo>& ClientImpl::GetDiscoverInfo(std::uint32_t* revision)
 {
 	if (serverListReq.request())
 	{
@@ -398,10 +401,13 @@ const std::vector<ServerInfo>& ClientImpl::GetDiscoverInfo()
 		});
 	}
 
+	if (revision != nullptr)
+		*revision = serverListReq.get_revision();
+
 	return serverListReq.front();
 }
 
-const std::vector<ServerConnection>& ClientImpl::GetConnections()
+const std::vector<ServerConnection>& ClientImpl::GetConnections(std::uint32_t* revision)
 {
 	if (connectionsListReq.request())
 	{
@@ -424,10 +430,13 @@ const std::vector<ServerConnection>& ClientImpl::GetConnections()
 		});
 	}
 
+	if (revision != nullptr)
+		*revision = connectionsListReq.get_revision();
+
 	return connectionsListReq.front();
 }
 
-const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(ServerConnection::id_t id)
+const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(ServerConnection::id_t id, std::uint32_t* revision)
 {
 	static std::vector<RemoteClient> empty;
 	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
@@ -448,6 +457,9 @@ const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(ServerConnection::
 			sc.clientsListReq.swap();
 		});
 	}
+
+	if (revision != nullptr)
+		*revision = m_connections[id].clientsListReq.get_revision();
 
 	return m_connections[id].clientsListReq.front();
 }
@@ -497,7 +509,7 @@ void ClientImpl::RefreshRooms(ServerConnection::id_t id)
 	});
 }
 
-const std::vector<Room>& ClientImpl::GetRooms(ServerConnection::id_t id)
+const std::vector<Room>& ClientImpl::GetRooms(ServerConnection::id_t id, std::uint32_t* revision)
 {
 	static std::vector<Room> empty;
 	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
@@ -518,6 +530,9 @@ const std::vector<Room>& ClientImpl::GetRooms(ServerConnection::id_t id)
 			sc.roomsListReq.swap();
 		});
 	}
+
+	if (revision != nullptr)
+		*revision = m_connections[id].roomsListReq.get_revision();
 
 	return m_connections[id].roomsListReq.front();
 }
@@ -623,7 +638,22 @@ void ClientImpl::SendToRoom(ServerConnection::id_t id, const Packet& packet, Pac
 
 	shared<Packet> shared_packet(new Packet());
 	shared_packet->append(packet.getData(), packet.getDataSize());
+	SendToRoom(id, shared_packet, mask);
+}
 
+void ClientImpl::SendToRoom(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	shared<Packet> shared_packet(new Packet());
+	shared_packet->append(data, lenght);
+	SendToRoom(id, shared_packet, mask);
+}
+
+void ClientImpl::SendToRoom(ServerConnection::id_t id, shared<Packet> packet, Packet::ReliabilityBitmask mask = Packet::Unreliable)
+{
+	shared<Packet> shared_packet = packet;
 	PacketReliability reliability;
 	switch (mask)
 	{
@@ -655,7 +685,7 @@ void ClientImpl::SendToRoom(ServerConnection::id_t id, const Packet& packet, Pac
 		bstream.Write((std::uint8_t) reliability);
 
 		const char* data[2] = { (const char*)bstream.GetData(), (const char*)shared_packet->getData() };
-		int lengths[2] = { (int) bstream.GetNumberOfBytesUsed(), (int)shared_packet->getDataSize() };
+		int lengths[2] = { (int)bstream.GetNumberOfBytesUsed(), (int)shared_packet->getDataSize() };
 		m_peer->SendList(data, lengths, 2, MEDIUM_PRIORITY, reliability, id & 0xFF, conn.addr, false);
 	});
 }
@@ -1149,19 +1179,19 @@ void Client::RefreshDiscoverInfo()
 	m_impl->RefreshDiscoverInfo();
 }
 
-const std::vector<ServerInfo>& Client::GetDiscoverInfo()
+const std::vector<ServerInfo>& Client::GetDiscoverInfo(std::uint32_t* revision)
 {
-	return m_impl->GetDiscoverInfo();
+	return m_impl->GetDiscoverInfo(revision);
 }
 
-const std::vector<ServerConnection>& Client::GetConnections()
+const std::vector<ServerConnection>& Client::GetConnections(std::uint32_t* revision)
 {
-	return m_impl->GetConnections();
+	return m_impl->GetConnections(revision);
 }
 
-const std::vector<RemoteClient>& Client::GetRemoteClients(ServerConnection::id_t id)
+const std::vector<RemoteClient>& Client::GetRemoteClients(ServerConnection::id_t id, std::uint32_t* revision)
 {
-	return m_impl->GetRemoteClients(id);
+	return m_impl->GetRemoteClients(id, revision);
 }
 
 RemoteClient::id_t Client::GetLocalClientId(ServerConnection::id_t id)
@@ -1179,9 +1209,9 @@ void Client::RefreshRooms(ServerConnection::id_t id)
 	m_impl->RefreshRooms(id);
 }
 
-const std::vector<Room>& Client::GetRooms(ServerConnection::id_t id)
+const std::vector<Room>& Client::GetRooms(ServerConnection::id_t id, std::uint32_t* revision)
 {
-	return m_impl->GetRooms(id);
+	return m_impl->GetRooms(id, revision);
 }
 
 void Client::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots)
@@ -1217,6 +1247,11 @@ std::uint32_t Client::GetJoinedRoomSlot(ServerConnection::id_t id)
 void Client::SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask)
 {
 	m_impl->SendToRoom(id, packet, mask);
+}
+
+void Client::SendToRoom(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask)
+{
+	m_impl->SendToRoom(id, data, lenght, mask);
 }
 
 std::size_t Client::GetDataSizeOfNextReceived()

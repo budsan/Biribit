@@ -96,15 +96,15 @@ public:
 	void ClearDiscoverInfo();
 	void RefreshDiscoverInfo();
 
-	const std::vector<ServerInfo>& GetDiscoverInfo();
-	const std::vector<ServerConnection>& GetConnections();
-	const std::vector<RemoteClient>& GetRemoteClients(ServerConnection::id_t id);
+	const std::vector<ServerInfo>& GetDiscoverInfo(std::uint32_t* revision = nullptr);
+	const std::vector<ServerConnection>& GetConnections(std::uint32_t* revision = nullptr);
+	const std::vector<RemoteClient>& GetRemoteClients(ServerConnection::id_t id, std::uint32_t* revision = nullptr);
 
 	RemoteClient::id_t GetLocalClientId(ServerConnection::id_t id);
 	void SetLocalClientParameters(ServerConnection::id_t id, const ClientParameters& parameters);
 
 	void RefreshRooms(ServerConnection::id_t id);
-	const std::vector<Room>& GetRooms(ServerConnection::id_t id);
+	const std::vector<Room>& GetRooms(ServerConnection::id_t id, std::uint32_t* revision = nullptr);
 
 	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots);
 	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id);
@@ -116,6 +116,7 @@ public:
 	std::uint32_t GetJoinedRoomSlot(ServerConnection::id_t id);
 
 	void SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask = Packet::Unreliable);
+	void SendToRoom(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask = Packet::Unreliable);
 
 	std::size_t GetDataSizeOfNextReceived();
 	std::unique_ptr<Received> PullReceived();

@@ -25,7 +25,6 @@ target_link_libraries(TestClient
 	${TEST_CLIENT_LIBRARIES}
 	SDL2
 	BiribitClient
-	BiribitForUnity
 )
 
 if(SYS_OS_UNIX)
