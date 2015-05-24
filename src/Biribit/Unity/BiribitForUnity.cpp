@@ -101,13 +101,17 @@ const brbt_ServerInfo_array brbt_GetDiscoverInfo(brbt_Client client, unsigned in
 
 	unsigned int rev;
 	auto client_result = cl->GetDiscoverInfo(&rev);
+	static std::vector<std::string> temp_alloc;
 	if (temp_array.revision_check(rev))
 	{
+		temp_alloc.clear();
 		brbt_ServerInfo* arr = temp_array.resize<brbt_ServerInfo>(client_result.size());
 		for (std::size_t i = 0; i < client_result.size(); i++)
-		{ 
-			arr[i].name = client_result[i].name.c_str();
-			arr[i].addr = client_result[i].addr.c_str();
+		{
+			temp_alloc.push_back(client_result[i].name);
+			arr[i].name = temp_alloc.back().c_str();
+			temp_alloc.push_back(client_result[i].addr);
+			arr[i].addr = temp_alloc.back().c_str();
 			arr[i].ping = client_result[i].ping;
 			arr[i].port = client_result[i].port;
 			arr[i].passwordProtected = client_result[i].passwordProtected;
@@ -127,13 +131,16 @@ const brbt_ServerConnection_array brbt_GetConnections(brbt_Client client, unsign
 
 	unsigned int rev;
 	auto client_result = cl->GetConnections(&rev);
+	static std::vector<std::string> temp_alloc;
 	if (temp_array.revision_check(rev))
 	{
+		temp_alloc.clear();
 		brbt_ServerConnection* arr = temp_array.resize<brbt_ServerConnection>(client_result.size());
 		for (std::size_t i = 0; i < client_result.size(); i++)
 		{
 			arr[i].id = client_result[i].id;
-			arr[i].name = client_result[i].name.c_str();
+			temp_alloc.push_back(client_result[i].name);
+			arr[i].name = temp_alloc.back().c_str();
 			arr[i].ping = client_result[i].ping;
 		}
 	}
@@ -150,14 +157,18 @@ const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_Client client, brbt_id_
 
 	unsigned int rev;
 	auto client_result = cl->GetRemoteClients(id_conn, &rev);
+	static std::vector<std::string> temp_alloc;
 	if (temp_array.revision_check(rev))
 	{
+		temp_alloc.clear();
 		brbt_RemoteClient* arr = temp_array.resize<brbt_RemoteClient>(client_result.size());
 		for (std::size_t i = 0; i < client_result.size(); i++)
 		{
 			arr[i].id = client_result[i].id;
-			arr[i].name = client_result[i].name.c_str();
-			arr[i].appid = client_result[i].appid.c_str();
+			temp_alloc.push_back(client_result[i].name);
+			arr[i].name = temp_alloc.back().c_str();
+			temp_alloc.push_back(client_result[i].appid);
+			arr[i].appid = temp_alloc.back().c_str();
 		}
 	}
 
@@ -173,13 +184,13 @@ brbt_id_t brbt_GetLocalClientId(brbt_Client client, brbt_id_t id_conn)
 	return cl->GetLocalClientId(id_conn);
 }
 
-void brbt_SetLocalClientParameters(brbt_Client client, brbt_id_t id_conn, const brbt_ClientParameters* parameters)
+void brbt_SetLocalClientParameters(brbt_Client client, brbt_id_t id_conn, brbt_ClientParameters _parameters)
 {
 	Biribit::Client* cl = (Biribit::Client*) client.impl;
-	Biribit::ClientParameters params;
-	params.name = parameters->name;
-	params.appid = parameters->appid;
-	cl->SetLocalClientParameters(id_conn, params);
+	Biribit::ClientParameters parameters;
+	parameters.name = _parameters.name;
+	parameters.appid = _parameters.appid;
+	cl->SetLocalClientParameters(id_conn, parameters);
 }
 
 void brbt_RefreshRooms(brbt_Client client, brbt_id_t id_conn)
@@ -200,10 +211,6 @@ const brbt_Room_array brbt_GetRooms(brbt_Client client, brbt_id_t id_conn, unsig
 		brbt_Room* arr = temp_array.resize<brbt_Room>(client_result.size());
 		for (std::size_t i = 0; i < client_result.size(); i++)
 		{
-			brbt_id_t id;
-			unsigned int slots_size;
-			brbt_id_t* slots;
-
 			arr[i].id = client_result[i].id;
 			arr[i].slots_size = client_result[i].slots.size();
 			arr[i].slots = client_result[i].slots.data();
@@ -252,10 +259,10 @@ unsigned int brbt_GetJoinedRoomSlot(brbt_Client client, brbt_id_t id_conn)
 	return cl->GetJoinedRoomSlot(id_conn);
 }
 
-void brbt_SendToRoom(brbt_Client client, brbt_id_t id_con, const char* data, unsigned int size, brbt_ReliabilityBitmask mask)
+void brbt_SendToRoom(brbt_Client client, brbt_id_t id_con, const void* data, unsigned int size, brbt_ReliabilityBitmask mask)
 {
 	Biribit::Client* cl = (Biribit::Client*) client.impl;
-	cl->SendToRoom(id_con, data, size, (Biribit::Packet::ReliabilityBitmask) mask);
+	cl->SendToRoom(id_con, (const char*) data, size, (Biribit::Packet::ReliabilityBitmask) mask);
 }
 
 unsigned int brbt_GetDataSizeOfNextReceived(brbt_Client client)

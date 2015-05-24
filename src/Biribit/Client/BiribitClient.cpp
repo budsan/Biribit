@@ -304,12 +304,13 @@ void ClientImpl::Connect(const char* addr, unsigned short port, const char* pass
 		port = SERVER_DEFAULT_PORT;
 
 	static const char localhost[] = "localhost";
-	if (addr == nullptr)
+	if (addr == nullptr || strcmp(addr, "") == 0)
 		addr = localhost;
 
 	m_pool->enqueue([this, addr, port, password]()
 	{
-		RakNet::ConnectionAttemptResult car = m_peer->Connect(addr, port, password, password != nullptr ? (int) strlen(password) : 0);
+		const char* pass = (strcmp(password, "") == 0) ? nullptr : password;
+		RakNet::ConnectionAttemptResult car = m_peer->Connect(addr, port, pass, pass != nullptr ? (int)strlen(password) : 0);
 		if (car != RakNet::CONNECTION_ATTEMPT_STARTED)
 			printLog("Connect failed: %s", ConnectionAttemptResultStr[car]);
 	});
@@ -367,14 +368,21 @@ void ClientImpl::ClearDiscoverInfo()
 {
 	m_pool->enqueue([this]()
 	{
+		bool modified = false;
 		auto it = serverList.begin();
 		while (it != serverList.end())
 		{
 			if (it->second.id == ServerConnection::UNASSIGNED_ID)
+			{
 				it = serverList.erase(it);
+				modified = true;
+			}
 			else
 				it++;
 		}
+
+		if (modified)
+			serverListReq.set_dirty();
 	});
 }
 

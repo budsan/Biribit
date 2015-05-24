@@ -86,7 +86,7 @@ struct brbt_Received
 	brbt_id_t room_id;
 	unsigned char slot_id;
 	unsigned int data_size;
-	const char* data;
+	const void* data;
 };
 
 API_C_EXPORT brbt_Client brbt_CreateClient();
@@ -105,7 +105,7 @@ API_C_EXPORT const brbt_ServerConnection_array brbt_GetConnections(brbt_Client c
 API_C_EXPORT const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_Client client, brbt_id_t id_conn, unsigned int* revision);
 
 API_C_EXPORT brbt_id_t brbt_GetLocalClientId(brbt_Client client, brbt_id_t id_conn);
-API_C_EXPORT void brbt_SetLocalClientParameters(brbt_Client client, brbt_id_t id_conn, const brbt_ClientParameters* parameters);
+API_C_EXPORT void brbt_SetLocalClientParameters(brbt_Client client, brbt_id_t id_conn, brbt_ClientParameters parameters);
 
 API_C_EXPORT void brbt_RefreshRooms(brbt_Client client, brbt_id_t id_conn);
 API_C_EXPORT const brbt_Room_array brbt_GetRooms(brbt_Client client, brbt_id_t id_conn, unsigned int* revision);
@@ -119,7 +119,7 @@ API_C_EXPORT void brbt_JoinRoomAndSlot(brbt_Client client, brbt_id_t id_conn, br
 API_C_EXPORT brbt_id_t brbt_GetJoinedRoomId(brbt_Client client, brbt_id_t id_conn);
 API_C_EXPORT unsigned int brbt_GetJoinedRoomSlot(brbt_Client client, brbt_id_t id_conn);
 
-API_C_EXPORT void brbt_SendToRoom(brbt_Client client, brbt_id_t id_con, const char* data, unsigned int size, brbt_ReliabilityBitmask mask);
+API_C_EXPORT void brbt_SendToRoom(brbt_Client client, brbt_id_t id_con, const void* data, unsigned int size, brbt_ReliabilityBitmask mask);
 
 API_C_EXPORT unsigned int brbt_GetDataSizeOfNextReceived(brbt_Client client);
 API_C_EXPORT const brbt_Received* brbt_PullReceived(brbt_Client client);
