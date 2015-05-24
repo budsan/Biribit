@@ -14,7 +14,10 @@ const unsigned int   CLIENT_MAX_CONNECTIONS = 8;
 
 enum BiribitMessageIDTypes
 {
-	ID_SERVER_INFO_REQUEST = ID_USER_PACKET_ENUM,
+	ID_ERROR_CODE = ID_USER_PACKET_ENUM,
+	//sv > cl: follows BiribitErrorTypes(uin32_t)
+
+	ID_SERVER_INFO_REQUEST,
 	//cl > sv: nothing follows
 
 	ID_SERVER_INFO_RESPONSE,
@@ -31,9 +34,6 @@ enum BiribitMessageIDTypes
 
 	ID_CLIENT_UPDATE_STATUS,
 	//cl > sv: follows Proto::ClientUpdate
-
-	ID_CLIENT_NAME_IN_USE,
-	//sv > cl: nothing follows
 
 	ID_CLIENT_STATUS_UPDATED,
 	//sv > cl: follows Proto::Client
@@ -64,4 +64,20 @@ enum BiribitMessageIDTypes
 
 	ID_BROADCAST_FROM_ROOM
 	//sv -> cl: follows sender_slot(uin8_t) + binary data
+};
+
+enum BiribitErrorTypes
+{
+	ERROR_CODE = 0,
+	WARN_CLIENT_NAME_IN_USE,
+	WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID,
+	WARN_CANNOT_CREATE_ROOM_WITHOUT_APPID,
+	WARN_CANNOT_CREATE_ROOM_WITH_WRONG_SLOT_NUMBER,
+	WARN_CANNOT_CREATE_ROOM_WITH_TOO_MANY_SLOTS,
+	WARN_CANNOT_JOIN_WITHOUT_ROOM_ID,
+	WARN_CANNOT_JOIN_TO_UNEXISTING_ROOM,
+	WARN_CANNOT_JOIN_TO_OTHER_APP_ROOM,
+	WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT,
+	WARN_CANNOT_JOIN_TO_INVALID_SLOT,
+	WARN_CANNOT_JOIN_TO_FULL_ROOM
 };

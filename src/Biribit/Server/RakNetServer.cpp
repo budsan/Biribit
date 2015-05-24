@@ -186,11 +186,7 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 
 		// another client is using that name
 		if (already_used)
-		{
-			RakNet::BitStream bstream;
-			bstream.Write((RakNet::MessageID)ID_CLIENT_NAME_IN_USE);
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
-		}
+			SendErrorCode(WARN_CLIENT_NAME_IN_USE, addr);
 	}
 
 	if (proto_update->has_appid() && client->appid != proto_update->appid())
@@ -216,6 +212,7 @@ void RakNetServer::ListRooms(RakNet::SystemAddress addr)
 {
 	unique<Client>& client = GetClient(addr);
 	if (client->appid.empty()) {
+		SendErrorCode(WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID, addr);
 		printLog("WARN: Client (%d) \"%s\" can't list rooms without appid.", client->id, client->name.c_str());
 		return;
 	}
@@ -241,16 +238,19 @@ void RakNetServer::CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* pro
 {
 	unique<Client>& client = GetClient(addr);
 	if (client->appid.empty()) {
+		SendErrorCode(WARN_CANNOT_CREATE_ROOM_WITHOUT_APPID, addr);
 		printLog("WARN: Client (%d) \"%s\" can't create a room without appid.", client->id, client->name.c_str());
 		return;
 	}
 
 	if (!proto_create->has_client_slots() || proto_create->client_slots() == 0) {
+		SendErrorCode(WARN_CANNOT_CREATE_ROOM_WITH_WRONG_SLOT_NUMBER, addr);
 		printLog("WARN: Client (%d) \"%s\" tried to create a room with a wrong slot number.", client->id, client->name.c_str());
 		return;
 	}
 
 	if (proto_create->client_slots() > 0xFF) {
+		SendErrorCode(WARN_CANNOT_CREATE_ROOM_WITH_TOO_MANY_SLOTS, addr);
 		printLog("WARN: Client (%d) \"%s\" tried to create a room with too many slots.", client->id, client->name.c_str());
 		return;
 	}
@@ -285,6 +285,7 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 {
 	unique<Client>& client = GetClient(addr);
 	if (!proto_join->has_id()) {
+		SendErrorCode(WARN_CANNOT_JOIN_WITHOUT_ROOM_ID, addr);
 		printLog("WARN: Client (%d) \"%s\" sent RoomJoin without room id.", client->id, client->name.c_str());
 		return;
 	}
@@ -301,11 +302,13 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 		if (id != Room::UNASSIGNED_ID)
 		{
 			if (m_rooms[id] == nullptr) {
+				SendErrorCode(WARN_CANNOT_JOIN_TO_UNEXISTING_ROOM, addr);
 				printLog("WARN: Client (%d) \"%s\" tried to join to unexisting room.", client->id, client->name.c_str());
 				return;
 			}
 
 			if (m_rooms[id]->appid != client->appid) {
+				SendErrorCode(WARN_CANNOT_JOIN_TO_OTHER_APP_ROOM, addr);
 				printLog("WARN: Client (%d) \"%s\" tried to join other app's room.", client->id, client->name.c_str());
 				return;
 			}
@@ -320,6 +323,10 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 			{
 				slot = proto_join->slot_to_join();
 				if (slot >= room->slots.size() || room->slots[slot] != Client::UNASSIGNED_ID) {
+					if (slot >= room->slots.size())
+						SendErrorCode(WARN_CANNOT_JOIN_TO_INVALID_SLOT, addr);
+					else
+						SendErrorCode(WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT, addr);
 					printLog("WARN: Client (%d) \"%s\" tried to join an invalid slot.", client->id, client->name.c_str());
 					return;
 				}
@@ -328,6 +335,7 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 			{
 				for (slot = 0; slot < room->slots.size() && room->slots[slot] != Client::UNASSIGNED_ID; slot++);
 				if (slot >= m_rooms[id]->slots.size()) {
+					SendErrorCode(WARN_CANNOT_JOIN_TO_FULL_ROOM, addr);
 					printLog("WARN: Client (%d) \"%s\" tried to join a full room.", client->id, client->name.c_str());
 					return;
 				}
@@ -349,6 +357,10 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 			std::uint32_t oldslot = client->joined_slot;
 			std::uint32_t slot = proto_join->slot_to_join();
 			if (slot >= room->slots.size() || room->slots[slot] != Client::UNASSIGNED_ID) {
+				if (slot >= room->slots.size())
+					SendErrorCode(WARN_CANNOT_JOIN_TO_INVALID_SLOT, addr);
+				else
+					SendErrorCode(WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT, addr);
 				printLog("WARN: Client (%d) \"%s\" tried to join an invalid slot.", client->id, client->name.c_str());
 				return;
 			}
@@ -555,6 +567,9 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		printLog("ID_CONNECTION_LOST %s", p->systemAddress.ToString());
 		RemoveClient(p->systemAddress);
 		break;
+	case ID_ERROR_CODE:
+		BIRIBIT_WARN("Nothing to do with ID_ERROR_CODE");
+		break;
 	case ID_SERVER_INFO_REQUEST:
 	{
 		Proto::ServerInfo proto_info;
@@ -588,7 +603,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, p->systemAddress, false);
 
 		break;
-	}	
+	}
 	case ID_SERVER_STATUS_RESPONSE:
 		BIRIBIT_WARN("Nothing to do with ID_SERVER_STATUS_RESPONSE");
 		break;
@@ -598,10 +613,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		if (ReadMessage(proto_update, stream))
 			UpdateClient(p->systemAddress, &proto_update);
 		break;
-	}	
-	case ID_CLIENT_NAME_IN_USE:
-		BIRIBIT_WARN("Nothing to do with ID_CLIENT_NAME_IN_USE");
-		break;
+	}
 	case ID_CLIENT_STATUS_UPDATED:
 		BIRIBIT_WARN("Nothing to do with ID_SERVER_CLIENT_NAME_CHANGED");
 		break;
@@ -670,6 +682,15 @@ template<typename T> bool RakNetServer::ReadMessage(T& msg, RakNet::BitStream& b
 	bstream.Read(m_buffer.data, size);
 	return msg.ParseFromArray(m_buffer.data, size);
 }
+
+void RakNetServer::SendErrorCode(std::uint32_t error_code, RakNet::AddressOrGUID systemIdentifier)
+{
+	RakNet::BitStream tosend;
+	tosend.Write((RakNet::MessageID) ID_ERROR_CODE);
+	tosend.Write(error_code);
+	m_peer->Send(&tosend, LOW_PRIORITY, RELIABLE, 0, systemIdentifier, false);
+}
+
 
 bool RakNetServer::Run(unsigned short _port, const char* _name, const char* _password)
 {

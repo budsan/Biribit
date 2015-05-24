@@ -309,7 +309,7 @@ void ClientImpl::Connect(const char* addr, unsigned short port, const char* pass
 
 	m_pool->enqueue([this, addr, port, password]()
 	{
-		const char* pass = (strcmp(password, "") == 0) ? nullptr : password;
+		const char* pass = (password == nullptr || (strcmp(password, "") == 0)) ? nullptr : password;
 		RakNet::ConnectionAttemptResult car = m_peer->Connect(addr, port, pass, pass != nullptr ? (int)strlen(password) : 0);
 		if (car != RakNet::CONNECTION_ATTEMPT_STARTED)
 			printLog("Connect failed: %s", ConnectionAttemptResultStr[car]);
@@ -844,6 +844,37 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	case ID_CONNECTION_REQUEST_ACCEPTED:
 		ConnectedAt(pPacket->systemAddress);
 		break;
+	case ID_ERROR_CODE:
+	{
+		std::uint32_t errorCode;
+		stream.Read(errorCode);
+		switch (errorCode)
+		{
+		case WARN_CLIENT_NAME_IN_USE:
+			printLog("Error code WARN_CLIENT_NAME_IN_USE"); break;
+		case WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID:
+			printLog("Error code WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID"); break;
+		case WARN_CANNOT_CREATE_ROOM_WITHOUT_APPID:
+			printLog("Error code WARN_CANNOT_CREATE_ROOM_WITHOUT_APPID"); break;
+		case WARN_CANNOT_CREATE_ROOM_WITH_WRONG_SLOT_NUMBER:
+			printLog("Error code WARN_CANNOT_CREATE_ROOM_WITH_WRONG_SLOT_NUMBER"); break;
+		case WARN_CANNOT_CREATE_ROOM_WITH_TOO_MANY_SLOTS:
+			printLog("Error code WARN_CANNOT_CREATE_ROOM_WITH_TOO_MANY_SLOTS"); break;
+		case WARN_CANNOT_JOIN_WITHOUT_ROOM_ID:
+			printLog("Error code WARN_CANNOT_JOIN_WITHOUT_ROOM_ID"); break;
+		case WARN_CANNOT_JOIN_TO_UNEXISTING_ROOM:
+			printLog("Error code WARN_CANNOT_JOIN_TO_UNEXISTING_ROOM"); break;
+		case WARN_CANNOT_JOIN_TO_OTHER_APP_ROOM:
+			printLog("Error code WARN_CANNOT_JOIN_TO_OTHER_APP_ROOM"); break;
+		case WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT:
+			printLog("Error code WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT"); break;
+		case WARN_CANNOT_JOIN_TO_INVALID_SLOT:
+			printLog("Error code WARN_CANNOT_JOIN_TO_INVALID_SLOT"); break;
+		case WARN_CANNOT_JOIN_TO_FULL_ROOM:
+			printLog("Error code WARN_CANNOT_JOIN_TO_FULL_ROOM"); break;
+		}
+		break;
+	}
 	case ID_SERVER_INFO_REQUEST:
 		BIRIBIT_WARN("Nothing to do with ID_SERVER_INFO_REQUEST");
 		break;
@@ -904,9 +935,6 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	}
 	case ID_CLIENT_UPDATE_STATUS:
 		BIRIBIT_WARN("Nothing to do with ID_CLIENT_UPDATE_STATUS");
-		break;
-	case ID_CLIENT_NAME_IN_USE:
-		//TODO
 		break;
 	case ID_CLIENT_STATUS_UPDATED:
 	{

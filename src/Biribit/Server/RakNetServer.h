@@ -96,6 +96,8 @@ class RakNetServer
 	bool WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, ::google::protobuf::MessageLite& msg);
 	template<typename T> bool ReadMessage(T& msg, RakNet::BitStream& bstream);
 
+	void SendErrorCode(std::uint32_t error_code, RakNet::AddressOrGUID systemIdentifier);
+
 public:
 
 	RakNetServer();
