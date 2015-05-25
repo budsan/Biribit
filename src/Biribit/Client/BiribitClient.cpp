@@ -409,10 +409,7 @@ const std::vector<ServerInfo>& ClientImpl::GetDiscoverInfo(std::uint32_t* revisi
 		});
 	}
 
-	if (revision != nullptr)
-		*revision = serverListReq.get_revision();
-
-	return serverListReq.front();
+	return serverListReq.front(revision);
 }
 
 const std::vector<ServerConnection>& ClientImpl::GetConnections(std::uint32_t* revision)
@@ -438,10 +435,7 @@ const std::vector<ServerConnection>& ClientImpl::GetConnections(std::uint32_t* r
 		});
 	}
 
-	if (revision != nullptr)
-		*revision = connectionsListReq.get_revision();
-
-	return connectionsListReq.front();
+	return connectionsListReq.front(revision);
 }
 
 const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(ServerConnection::id_t id, std::uint32_t* revision)
@@ -466,10 +460,7 @@ const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(ServerConnection::
 		});
 	}
 
-	if (revision != nullptr)
-		*revision = m_connections[id].clientsListReq.get_revision();
-
-	return m_connections[id].clientsListReq.front();
+	return m_connections[id].clientsListReq.front(revision);
 }
 
 RemoteClient::id_t ClientImpl::GetLocalClientId(ServerConnection::id_t id)
@@ -539,10 +530,7 @@ const std::vector<Room>& ClientImpl::GetRooms(ServerConnection::id_t id, std::ui
 		});
 	}
 
-	if (revision != nullptr)
-		*revision = m_connections[id].roomsListReq.get_revision();
-
-	return m_connections[id].roomsListReq.front();
+	return m_connections[id].roomsListReq.front(revision);
 }
 
 void ClientImpl::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots)

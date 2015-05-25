@@ -1,6 +1,7 @@
 #pragma once
 
 #include <utility>
+#include <mutex>
 
 template<class T> class RefSwap
 {
@@ -10,6 +11,7 @@ template<class T> class RefSwap
 	bool ready;
 	bool dirty;
 
+	std::mutex mutex;
 	unsigned int revision;
 
 public:
@@ -29,7 +31,11 @@ public:
 		delete ptr[1];
 	}
 
-	T& front() {
+	T& front(unsigned int* _revision) {
+		std::lock_guard<std::mutex> lock(mutex);
+		if (_revision != nullptr)
+			*_revision = revision;
+		
 		return *ptr[sel&1];
 	}
 
@@ -52,12 +58,8 @@ public:
 		dirty = true;
 	}
 
-	unsigned int get_revision()
-	{
-		return revision;
-	}
-
 	void swap() {
+		std::lock_guard<std::mutex> lock(mutex);
 		revision++;
 		sel = ~sel;
 		ready = true;
