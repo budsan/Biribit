@@ -156,6 +156,7 @@ const brbt_ServerConnection_array brbt_GetConnections(brbt_id_t client, unsigned
 		*revision = rev;
 	return temp_array.convert<brbt_ServerConnection_array>();
 }
+
 const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_id_t client, brbt_id_t id_conn, unsigned int* revision)
 {
 	static brbt_array temp_array;
@@ -163,18 +164,18 @@ const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_id_t client, brbt_id_t 
 
 	unsigned int rev;
 	auto client_result = cl->GetRemoteClients(id_conn, &rev);
-	static std::vector<std::string> temp_alloc;
+	static std::vector<std::string> remoteclients_temp_alloc;
 	if (temp_array.revision_check(rev))
 	{
-		temp_alloc.clear();
+		remoteclients_temp_alloc.clear();
 		brbt_RemoteClient* arr = temp_array.resize<brbt_RemoteClient>(client_result.size());
 		for (std::size_t i = 0; i < client_result.size(); i++)
 		{
 			arr[i].id = client_result[i].id;
-			temp_alloc.push_back(client_result[i].name);
-			arr[i].name = temp_alloc.back().c_str();
-			temp_alloc.push_back(client_result[i].appid);
-			arr[i].appid = temp_alloc.back().c_str();
+			remoteclients_temp_alloc.push_back(client_result[i].name);
+			arr[i].name = remoteclients_temp_alloc.back().c_str();
+			remoteclients_temp_alloc.push_back(client_result[i].appid);
+			arr[i].appid = remoteclients_temp_alloc.back().c_str();
 		}
 	}
 
@@ -280,17 +281,23 @@ unsigned int brbt_GetDataSizeOfNextReceived(brbt_id_t client)
 
 const brbt_Received* brbt_PullReceived(brbt_id_t client)
 {
-	std::unique_ptr<Biribit::Client>& cl = clients[client];
-
+	static std::unique_ptr<Biribit::Received> recv;
 	static brbt_Received st_recv;
-	static std::unique_ptr<Biribit::Received> recv = cl->PullReceived();
 
-	st_recv.when = recv->when;
-	st_recv.connection = recv->connection;
-	st_recv.room_id = recv->room_id;
-	st_recv.slot_id = recv->slot_id;
-	st_recv.data_size = recv->data.getDataSize();
-	st_recv.data = (const char*) recv->data.getData();
-
-	return &st_recv;
+	std::unique_ptr<Biribit::Client>& cl = clients[client];
+	recv = cl->PullReceived();
+	if (recv != nullptr)
+	{
+		st_recv.when = recv->when;
+		st_recv.connection = recv->connection;
+		st_recv.room_id = recv->room_id;
+		st_recv.slot_id = recv->slot_id;
+		st_recv.data_size = recv->data.getDataSize();
+		st_recv.data = (const char*)recv->data.getData();
+		return &st_recv;
+	}
+	else
+	{
+		return nullptr;
+	}	
 }
