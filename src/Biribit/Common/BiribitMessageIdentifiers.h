@@ -50,7 +50,7 @@ enum BiribitMessageIDTypes
 	ID_ROOM_CREATE_REQUEST,
 	//cl > sv: follows Proto::RoomCreate
 
-	ID_ROOM_CHANGED,
+	ID_ROOM_STATUS,
 	//sv -> cl: follows Proto:Room
 
 	ID_ROOM_JOIN_REQUEST,
@@ -62,8 +62,14 @@ enum BiribitMessageIDTypes
 	ID_SEND_BROADCAST_TO_ROOM,
 	//cl -> sv: follows reliability(uin8_t) + binary data
 
-	ID_BROADCAST_FROM_ROOM
+	ID_BROADCAST_FROM_ROOM,
 	//sv -> cl: follows sender_slot(uin8_t) + binary data
+
+	ID_JOURNAL_ENTRIES_REQUEST,
+	//cl -> sv: follows Proto::RoomEntriesRequest
+
+	ID_JOURNAL_ENTRIES_STATUS
+	//sv -> cl: follows Proto::RoomEntriesStatus
 };
 
 enum BiribitErrorTypes

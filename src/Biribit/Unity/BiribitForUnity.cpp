@@ -61,9 +61,25 @@ brbt_id_t brbt_CreateClient()
 	return client;
 }
 
+// Useful in Unity for changing between scenes and keeping same instance.
+brbt_id_t single_instance = 0;
+brbt_id_t brbt_GetClientInstance()
+{
+	if (single_instance == 0)
+		single_instance = brbt_CreateClient();
+
+	return single_instance;
+}
+
 void brbt_DeleteClient(brbt_id_t client)
 {
-	clients[client] = nullptr;
+	if (client > 0 && client < clients.size())
+	{
+		if (single_instance == client)
+			single_instance = 0;
+
+		clients[client] = nullptr;
+	}
 }
 
 void brbt_Connect(brbt_id_t client, const char* addr, unsigned short port, const char* password)

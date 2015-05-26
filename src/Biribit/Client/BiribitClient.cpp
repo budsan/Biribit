@@ -79,6 +79,27 @@ Received::Received(Received&& to_move)
 	data = std::move(to_move.data);
 }
 
+Entry::Entry()
+	: id(UNASSIGNED_ID)
+	, from_slot(0)
+	, data()
+{
+}
+
+Entry::Entry(Entry&& to_move)
+{
+	this->operator=(std::move(to_move));
+}
+
+Entry& Entry::operator=(Entry&& to_move)
+{
+	std::swap(id, to_move.id);
+	std::swap(from_slot, to_move.from_slot);
+	data = std::move(data);
+	return *this;
+}
+
+
 //---------------------------------------------------------------------------//
 
 struct ServerInfoPriv
@@ -112,12 +133,18 @@ public:
 
 	std::vector<Room> rooms;
 	RefSwap<std::vector<Room>> roomsListReq;
+
 	Room::id_t joinedRoom;
 	std::uint32_t joinedSlot;
+	std::vector<Entry> joinedRoomEntries;
+	std::mutex entriesMutex;
 
 	ServerConnectionPriv();
 
 	bool isNull();
+	const Entry& GetEntry(Entry::id_t id);
+	void SetEntry(Entry& entry);
+	void ResetEntries();
 };
 
 ServerConnectionPriv::ServerConnectionPriv()
@@ -125,12 +152,39 @@ ServerConnectionPriv::ServerConnectionPriv()
 	, selfId(RemoteClient::UNASSIGNED_ID)
 	, joinedRoom(Room::UNASSIGNED_ID)
 	, joinedSlot(0)
+	, joinedRoomEntries(1)
 {
 }
 
 bool ServerConnectionPriv::isNull()
 {
 	return addr == RakNet::UNASSIGNED_SYSTEM_ADDRESS;
+}
+
+const Entry& ServerConnectionPriv::GetEntry(Entry::id_t id)
+{
+	{
+		std::lock_guard<std::mutex> lock(entriesMutex);
+		if (id > Entry::UNASSIGNED_ID && id < joinedRoomEntries.size())
+			return joinedRoomEntries[id];
+	}
+
+	return Entry();
+}
+
+void ServerConnectionPriv::SetEntry(Entry& entry)
+{
+	std::lock_guard<std::mutex> lock(entriesMutex);
+	if (entry.id <= joinedRoomEntries.size())
+		joinedRoomEntries.resize(entry.id + 1);
+
+	joinedRoomEntries[entry.id] = std::move(entry);
+}
+
+void ServerConnectionPriv::ResetEntries()
+{
+	std::lock_guard<std::mutex> lock(entriesMutex);
+	joinedRoomEntries.resize(1);
 }
 
 //---------------------------------------------------------------------------//
@@ -970,7 +1024,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	case ID_ROOM_CREATE_REQUEST:
 		BIRIBIT_WARN("Nothing to do with ID_ROOM_CREATE_REQUEST");
 		break;
-	case ID_ROOM_CHANGED:
+	case ID_ROOM_STATUS:
 	{
 		Proto::Room proto_room;
 		if (ReadMessage(proto_room, stream))
@@ -990,7 +1044,12 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			ServerConnectionPriv& sc = m_connections[si.id];
 			if (proto_join.has_id())
 			{
-				sc.joinedRoom = proto_join.id();
+				if (sc.joinedRoom == proto_join.id())
+				{
+					sc.joinedRoom = proto_join.id();
+					sc.ResetEntries();
+				}
+				
 				if (proto_join.has_slot_to_join())
 					sc.joinedSlot = proto_join.slot_to_join();
 			}	
@@ -1074,6 +1133,7 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 
 		sc.joinedRoom = Room::UNASSIGNED_ID;
 		sc.joinedSlot = 0;
+		sc.ResetEntries();
 
 		sc.clients.clear();
 		sc.clientsListReq.set_dirty();

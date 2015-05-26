@@ -422,7 +422,7 @@ void RakNetServer::RoomChanged(unique<Room>& room, RakNet::SystemAddress extra_a
 	Proto::Room proto_room;
 	PopulateProtoRoom(room, &proto_room);
 	RakNet::BitStream bstream;
-	if (WriteMessage(bstream, ID_ROOM_CHANGED, proto_room)) {
+	if (WriteMessage(bstream, ID_ROOM_STATUS, proto_room)) {
 		for (auto it = room->slots.begin(); it != room->slots.end(); it++) {
 			if (*it != Client::UNASSIGNED_ID) {
 				BIRIBIT_ASSERT(m_clients[*it] != nullptr);
@@ -633,8 +633,8 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 			CreateRoom(p->systemAddress, &proto_create);
 		break;
 	}
-	case ID_ROOM_CHANGED:
-		BIRIBIT_WARN("Nothing to do with ID_ROOM_CHANGED");
+	case ID_ROOM_STATUS:
+		BIRIBIT_WARN("Nothing to do with ID_ROOM_STATUS");
 		break;
 	case ID_ROOM_JOIN_REQUEST:
 	{

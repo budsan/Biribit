@@ -80,6 +80,23 @@ struct API_EXPORT Received
 	Received(Received&&);
 };
 
+struct API_EXPORT Entry
+{
+	typedef std::uint32_t id_t;
+	enum { UNASSIGNED_ID = 0 };
+
+	id_t id;
+	std::uint32_t from_slot;
+	Packet data;
+
+	Entry();
+	Entry(Entry&&);
+	Entry(const Entry&) = delete;
+
+	Entry& operator=(Entry&&);	
+	const Entry& operator=(const Entry&) = delete;
+};
+
 class ClientImpl;
 class API_EXPORT Client
 {

@@ -85,6 +85,7 @@ struct brbt_Received
 };
 
 API_C_EXPORT brbt_id_t brbt_CreateClient();
+API_C_EXPORT brbt_id_t brbt_GetClientInstance();
 API_C_EXPORT void brbt_DeleteClient(brbt_id_t client);
 
 API_C_EXPORT void brbt_Connect(brbt_id_t client, const char* addr, unsigned short port, const char* password);

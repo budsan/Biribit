@@ -25,3 +25,22 @@ message RoomJoin
 	optional uint32 id = 1;
 	optional uint32 slot_to_join = 2;
 }
+
+message RoomEntry
+{
+	required uint32 id = 1;
+	required uint32 from_slot = 2;
+	required bytes entry_data = 3;
+}
+
+message RoomEntriesRequest
+{
+	repeated uint32 entries_id = 3;
+}
+
+message RoomEntriesStatus
+{
+	optional uint32 room_id = 1;
+	optional uint32 journal_size = 2;
+	repeated RoomEntry entries = 3;
+}
