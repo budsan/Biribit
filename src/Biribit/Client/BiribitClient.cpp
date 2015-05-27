@@ -1065,7 +1065,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			ServerConnectionPriv& sc = m_connections[si.id];
 			if (proto_join.has_id())
 			{
-				if (sc.joinedRoom == proto_join.id())
+				if (sc.joinedRoom != proto_join.id())
 				{
 					sc.joinedRoom = proto_join.id();
 					sc.ResetEntries();
