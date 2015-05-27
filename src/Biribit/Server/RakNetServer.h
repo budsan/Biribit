@@ -74,6 +74,7 @@ class RakNetServer
 	void UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate* proto_update);
 
 	void ListRooms(RakNet::SystemAddress addr);
+	void JoinRandomOrCreate(RakNet::SystemAddress addr, Proto::RoomCreate* proto_create);
 	void CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* proto_create);
 	void JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_join);
 	bool LeaveRoom(unique<Client>& client);

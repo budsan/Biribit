@@ -234,6 +234,34 @@ void RakNetServer::ListRooms(RakNet::SystemAddress addr)
 	}
 }
 
+void RakNetServer::JoinRandomOrCreate(RakNet::SystemAddress addr, Proto::RoomCreate* proto_create)
+{
+	unique<Client>& client = GetClient(addr);
+	if (client->appid.empty()) {
+		SendErrorCode(WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID, addr);
+		printLog("WARN: Client (%d) \"%s\" can't list rooms without appid.", client->id, client->name.c_str());
+		return;
+	}
+
+	auto set_it = m_roomAppIdMap.find(client->appid);
+	if (set_it != m_roomAppIdMap.end())
+	{
+		for (auto it = set_it->second.begin(); it != set_it->second.end(); it++) {
+			BIRIBIT_ASSERT(m_rooms[*it] != nullptr);
+			unique<Room>& room = m_rooms[*it];
+			if (room->joined_clients_count < room->slots.size())
+			{
+				Proto::RoomJoin proto_join;
+				proto_join.set_id(room->id);
+				JoinRoom(addr, &proto_join);
+				return;
+			}
+		}
+	}
+
+	CreateRoom(addr, proto_create);
+}
+
 void RakNetServer::CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* proto_create)
 {
 	unique<Client>& client = GetClient(addr);
@@ -633,9 +661,13 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 			CreateRoom(p->systemAddress, &proto_create);
 		break;
 	}
-	case ID_ROOM_STATUS:
-		BIRIBIT_WARN("Nothing to do with ID_ROOM_STATUS");
+	case ID_ROOM_JOIN_RANDOM_OR_CREATE_REQUEST:
+	{
+		Proto::RoomCreate proto_create;
+		if (ReadMessage(proto_create, stream))
+			JoinRandomOrCreate(p->systemAddress, &proto_create);
 		break;
+	}
 	case ID_ROOM_JOIN_REQUEST:
 	{
 		Proto::RoomJoin proto_join;
@@ -643,6 +675,9 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 			JoinRoom(p->systemAddress, &proto_join);
 		break;
 	}
+	case ID_ROOM_STATUS:
+		BIRIBIT_WARN("Nothing to do with ID_ROOM_STATUS");
+		break;
 	case ID_ROOM_JOIN_RESPONSE:
 		BIRIBIT_WARN("Nothing to do with ID_ROOM_JOIN_RESPONSE");
 		break;

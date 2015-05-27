@@ -109,6 +109,8 @@ API_C_EXPORT const brbt_Room_array brbt_GetRooms(brbt_id_t client, brbt_id_t id_
 API_C_EXPORT void brbt_CreateRoom(brbt_id_t client, brbt_id_t id_conn, unsigned int num_slots);
 API_C_EXPORT void brbt_CreateRoomAndJoinSlot(brbt_id_t client, brbt_id_t id_conn, unsigned int num_slots, unsigned int slot_to_join_id);
 
+API_C_EXPORT void brbt_JoinRandomOrCreateRoom(brbt_id_t client, brbt_id_t id_conn, unsigned int num_slots);
+
 API_C_EXPORT void brbt_JoinRoom(brbt_id_t client, brbt_id_t id_conn, brbt_id_t room_id);
 API_C_EXPORT void brbt_JoinRoomAndSlot(brbt_id_t client, brbt_id_t id_conn, brbt_id_t room_id, unsigned int slot_id);
 

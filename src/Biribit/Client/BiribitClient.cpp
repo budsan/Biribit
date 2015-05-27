@@ -239,6 +239,8 @@ public:
 	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots);
 	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id);
 
+	void JoinRandomOrCreateRoom(ServerConnection::id_t id, std::uint32_t num_slots);
+
 	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id);
 	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::uint32_t slot_id);
 
@@ -622,6 +624,25 @@ void ClientImpl::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, 
 		proto_create.set_slot_to_join(slot_to_join_id);
 		RakNet::BitStream bstream;
 		if (WriteMessage(bstream, ID_ROOM_CREATE_REQUEST, proto_create))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, conn.addr, false);
+	});
+}
+
+void ClientImpl::JoinRandomOrCreateRoom(ServerConnection::id_t id, std::uint32_t num_slots)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	m_pool->enqueue([this, id, num_slots]()
+	{
+		ServerConnectionPriv& conn = m_connections[id];
+		if (conn.isNull())
+			return;
+
+		Proto::RoomCreate proto_create;
+		proto_create.set_client_slots(num_slots);
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_ROOM_JOIN_RANDOM_OR_CREATE_REQUEST, proto_create))
 			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, conn.addr, false);
 	});
 }
@@ -1306,6 +1327,11 @@ void Client::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots)
 void Client::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id)
 {
 	m_impl->CreateRoom(id, num_slots, slot_to_join_id);
+}
+
+void Client::JoinRandomOrCreateRoom(ServerConnection::id_t id, std::uint32_t num_slots)
+{
+	m_impl->JoinRandomOrCreateRoom(id, num_slots);
 }
 
 void Client::JoinRoom(ServerConnection::id_t id, Room::id_t room_id)

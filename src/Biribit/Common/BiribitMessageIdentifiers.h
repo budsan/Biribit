@@ -50,11 +50,14 @@ enum BiribitMessageIDTypes
 	ID_ROOM_CREATE_REQUEST,
 	//cl > sv: follows Proto::RoomCreate
 
-	ID_ROOM_STATUS,
-	//sv -> cl: follows Proto:Room
+	ID_ROOM_JOIN_RANDOM_OR_CREATE_REQUEST,
+	//cl -> sv: follows Proto::RoomCreate
 
 	ID_ROOM_JOIN_REQUEST,
 	//cl -> sv: follows Proto::RoomJoin
+
+	ID_ROOM_STATUS,
+	//sv -> cl: follows Proto:Room
 
 	ID_ROOM_JOIN_RESPONSE,
 	//sv -> cl: follows Proto::RoomJoin

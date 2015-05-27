@@ -126,6 +126,8 @@ public:
 	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots);
 	void CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id);
 
+	void JoinRandomOrCreateRoom(ServerConnection::id_t id, std::uint32_t num_slots);
+
 	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id);
 	void JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::uint32_t slot_id);
 

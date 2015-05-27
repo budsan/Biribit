@@ -215,13 +215,20 @@ private:
 
 			if (ImGui::CollapsingHeader("Rooms"))
 			{
-				ImGui::InputInt("Slots", &slots); ImGui::SameLine();
-				if (ImGui::Button("Create"))
+				ImGui::PushItemWidth(100);
+				ImGui::InputInt("Slots count", &slots); ImGui::PopItemWidth();
+				ImGui::SameLine();
+				if (ImGui::Button("Create Room"))
 					client->CreateRoom(connection.id, slots);
 
-				ImGui::InputInt("Joining slot", &slots_to_join); ImGui::SameLine();
-				if (ImGui::Button("& Join"))
+				ImGui::PushItemWidth(100);
+				ImGui::InputInt("Joining slot", &slots_to_join); ImGui::PopItemWidth();
+				ImGui::SameLine();
+				if (ImGui::Button("Create & Slot"))
 					client->CreateRoom(connection.id, slots, slots_to_join);
+
+				if (ImGui::Button("Join Random Or Create"))
+					client->JoinRandomOrCreateRoom(connection.id, slots);
 
 				if (!rooms_listbox.empty())
 				{

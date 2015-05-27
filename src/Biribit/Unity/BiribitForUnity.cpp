@@ -259,6 +259,12 @@ void brbt_CreateRoomAndJoinSlot(brbt_id_t client, brbt_id_t id_conn, unsigned in
 	cl->CreateRoom(id_conn, num_slots, slot_to_join_id);
 }
 
+void brbt_JoinRandomOrCreateRoom(brbt_id_t client, brbt_id_t id_conn, unsigned int num_slots)
+{
+	std::unique_ptr<Biribit::Client>& cl = clients[client];
+	cl->JoinRandomOrCreateRoom(id_conn, num_slots);
+}
+
 void brbt_JoinRoom(brbt_id_t client, brbt_id_t id_conn, brbt_id_t room_id)
 {
 	std::unique_ptr<Biribit::Client>& cl = clients[client];
