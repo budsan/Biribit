@@ -14,10 +14,10 @@ For further instructions about how build protobuf, please visit: https://github.
 - Ready to run as a daemon in Linux.
 - Several games can coexist in same server.
 - Server controls client names to be unique. Otherwise, renames as Name1, Name2…
-- Clients can communicate each other creating and joining rooms. Each room represents a game match.
-- Rooms have 2 ways of communication:
-- Broadcast binary data to other client in the room. Useful for real-time games.
-- Append a binary data entry to journal's room. Useful for turn-based games.
+- Server let clients join and create rooms. Each room represents a match.
+- Clients can communicate inside rooms. They have 2 ways of communication:
+  - Broadcast binary data to other client in the room. Useful for real-time games.
+  - Append a binary data entry to journal's room. Useful for turn-based games.
 
 ## Client library features:
 - Find servers in LAN.
