@@ -376,7 +376,12 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 			client->joined_slot = slot;
 			printLog("Client (%d) \"%s\" joins room %d.", client->id, client->name.c_str(), room->id);
 			RoomChanged(room);
-			something_changed = true;
+			
+			Proto::RoomJoin proto_join;
+			PopulateProtoRoomJoin(client, &proto_join);
+			RakNet::BitStream bstream;
+			if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
+				m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
 		}
 		else if (proto_join->has_slot_to_join() && client->joined_slot != proto_join->slot_to_join())
 		{
@@ -399,17 +404,16 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 
 			printLog("Client (%d) \"%s\" swaps slot from %d to %d in room %d.", client->id, client->name.c_str(), oldslot, slot, room->id);
 			RoomChanged(room);
-			something_changed = true;
-		}
-	}
+			
+			Proto::RoomJoin proto_join;
+			PopulateProtoRoomJoin(client, &proto_join);
+			RakNet::BitStream bstream;
+			if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
+				m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
 
-	if (something_changed)
-	{
-		Proto::RoomJoin proto_join;
-		PopulateProtoRoomJoin(client, &proto_join);
-		RakNet::BitStream bstream;
-		if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
+			Proto::RoomEntriesStatus proto_entries;
+			
+		}
 	}
 }
 
@@ -525,6 +529,17 @@ void RakNetServer::PopulateProtoRoomJoin(unique<Client>& client, Proto::RoomJoin
 	if (client->joined_room != Room::UNASSIGNED_ID)
 		proto_join->set_slot_to_join(client->joined_slot);
 }
+
+void RakNetServer::PopulateProtoRoomEntriesStatus(unique<Room>& room, Proto::RoomEntriesStatus* proto_entries)
+{
+	//optional uint32 room_id = 1;
+	//optional uint32 journal_size = 2;
+	//repeated RoomEntry entries = 3;
+
+	proto_entries->set_room_id(room->id);
+	proto_entries->set_journal_size(room->slots.size());
+}
+
 
 void RakNetServer::RaknetThreadUpdate(RakNet::RakPeerInterface *peer, void* data)
 {

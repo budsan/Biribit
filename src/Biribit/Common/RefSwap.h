@@ -43,21 +43,6 @@ public:
 		return *ptr[(~sel)&1];
 	}
 
-	bool request()
-	{
-		if (ready && dirty){
-			ready = false;
-			return true;
-		}
-
-		return false;
-	}
-
-	void set_dirty()
-	{
-		dirty = true;
-	}
-
 	void swap() {
 		std::lock_guard<std::mutex> lock(mutex);
 		revision++;

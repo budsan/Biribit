@@ -86,6 +86,7 @@ class RakNetServer
 	void PopulateProtoClient(unique<Client>& client, Proto::Client* proto_client);
 	void PopulateProtoRoom(unique<Room>& room, Proto::Room* proto_room);
 	void PopulateProtoRoomJoin(unique<Client>& client, Proto::RoomJoin* proto_join);
+	void PopulateProtoRoomEntriesStatus(unique<Room>& room, Proto::RoomEntriesStatus* proto_entries);
 
 	unique<TaskPool> m_pool;
 	Generic::TempBuffer m_buffer;

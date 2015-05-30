@@ -145,6 +145,9 @@ public:
 	const Entry& GetEntry(Entry::id_t id);
 	void SetEntry(Entry& entry);
 	void ResetEntries();
+
+	void UpdateRemoteClients();
+	void UpdateRooms();
 };
 
 ServerConnectionPriv::ServerConnectionPriv()
@@ -185,6 +188,30 @@ void ServerConnectionPriv::ResetEntries()
 {
 	std::lock_guard<std::mutex> lock(entriesMutex);
 	joinedRoomEntries.resize(1);
+}
+
+void ServerConnectionPriv::UpdateRemoteClients()
+{
+	std::vector<RemoteClient>& back = clientsListReq.back();
+	back.clear();
+
+	for (auto it = clients.begin(); it != clients.end(); it++)
+		if (it->id != RemoteClient::UNASSIGNED_ID)
+			back.push_back(*it);
+
+	clientsListReq.swap();
+}
+
+void ServerConnectionPriv::UpdateRooms()
+{
+	std::vector<Room>& back = roomsListReq.back();
+	back.clear();
+
+	for (auto it = rooms.begin(); it != rooms.end(); it++)
+		if (it->id != Room::UNASSIGNED_ID)
+			back.push_back(*it);
+
+	roomsListReq.swap();
 }
 
 //---------------------------------------------------------------------------//
@@ -279,6 +306,9 @@ private:
 	static void PopulateRemoteClient(RemoteClient&, const Proto::Client*);
 	static void PopulateRoom(Room&, const Proto::Room*);
 
+	void UpdateDiscoverInfo();
+	void UpdateConnections();
+
 	Generic::TempBuffer m_buffer;
 	
 	std::map<RakNet::SystemAddress, ServerInfoPriv> serverList;
@@ -350,7 +380,7 @@ void ClientImpl::RakNetUpdated()
 
 		m_current = RakNet::GetTimeMS();
 		if ((m_current - m_lastDirtyDueTime) > 1000)
-			connectionsListReq.set_dirty();
+			UpdateConnections();
 	});
 }
 
@@ -438,59 +468,17 @@ void ClientImpl::ClearDiscoverInfo()
 		}
 
 		if (modified)
-			serverListReq.set_dirty();
+			UpdateDiscoverInfo();
 	});
 }
 
 const std::vector<ServerInfo>& ClientImpl::GetDiscoverInfo(std::uint32_t* revision)
 {
-	if (serverListReq.request())
-	{
-		m_pool->enqueue([this]()
-		{
-			std::vector<ServerInfo>& back = serverListReq.back();
-			back.clear();
-
-			for (auto it = serverList.begin(); it != serverList.end(); it++)
-			{
-				if (it->second.valid)
-				{
-					back.push_back(it->second.data);
-					back.back().addr = it->first.ToString(false);
-					back.back().port = it->first.GetPort();
-				}
-			}
-
-			serverListReq.swap();
-		});
-	}
-
 	return serverListReq.front(revision);
 }
 
 const std::vector<ServerConnection>& ClientImpl::GetConnections(std::uint32_t* revision)
 {
-	if (connectionsListReq.request())
-	{
-		m_pool->enqueue([this]()
-		{
-			std::vector<ServerConnection>& back = connectionsListReq.back();
-			back.clear();
-
-			auto it = m_connections.begin(); it++;
-			for (; it != m_connections.end(); it++)
-			{
-				if (!it->isNull()) {
-					it->data.ping = m_peer->GetAveragePing(it->addr);
-					back.push_back(it->data);
-				}
-			}
-
-			connectionsListReq.swap();
-			RakNet::TimeMS m_lastDirtyDueTime = RakNet::GetTimeMS();
-		});
-	}
-
 	return connectionsListReq.front(revision);
 }
 
@@ -499,22 +487,6 @@ const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(ServerConnection::
 	static std::vector<RemoteClient> empty;
 	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return empty;
-		
-	if (m_connections[id].clientsListReq.request())
-	{
-		m_pool->enqueue([this, id]()
-		{
-			ServerConnectionPriv& sc = m_connections[id];
-			std::vector<RemoteClient>& back = sc.clientsListReq.back();
-			back.clear();
-
-			for (auto it = sc.clients.begin(); it != sc.clients.end(); it++)
-				if (it->id != RemoteClient::UNASSIGNED_ID)
-					back.push_back(*it);
-
-			sc.clientsListReq.swap();
-		});
-	}
 
 	return m_connections[id].clientsListReq.front(revision);
 }
@@ -569,22 +541,6 @@ const std::vector<Room>& ClientImpl::GetRooms(ServerConnection::id_t id, std::ui
 	static std::vector<Room> empty;
 	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return empty;
-
-	if (m_connections[id].roomsListReq.request())
-	{
-		m_pool->enqueue([this, id]()
-		{
-			ServerConnectionPriv& sc = m_connections[id];
-			std::vector<Room>& back = sc.roomsListReq.back();
-			back.clear();
-
-			for (auto it = sc.rooms.begin(); it != sc.rooms.end(); it++)
-				if (it->id != Room::UNASSIGNED_ID)
-					back.push_back(*it);
-
-			sc.roomsListReq.swap();
-		});
-	}
 
 	return m_connections[id].roomsListReq.front(revision);
 }
@@ -852,7 +808,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			{
 				ServerInfoPriv& si = serverList[pPacket->systemAddress];
 				PopulateServerInfo(si, &proto_info);
-				serverListReq.set_dirty();
+				UpdateDiscoverInfo();
 			}
 		}
 		break;
@@ -864,7 +820,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 
 		ServerInfoPriv& si = serverList[pPacket->systemAddress];
 		si.data.ping = current - pingTime;
-		serverListReq.set_dirty();
+		UpdateDiscoverInfo();
 		
 		Packet tosend;
 		tosend << (RakNet::MessageID) ID_SERVER_INFO_REQUEST;
@@ -952,10 +908,10 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			{
 				ServerConnectionPriv& sc = m_connections[si.id];
 				sc.data.name = proto_info.name();
-				connectionsListReq.set_dirty();
+				UpdateConnections();
 			}
 
-			serverListReq.set_dirty();
+			UpdateDiscoverInfo();
 		}
 
 		break;
@@ -992,7 +948,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 					PopulateRemoteClient(sc.clients[proto_client.id()], &proto_client);
 			}
 
-			sc.clientsListReq.set_dirty();
+			sc.UpdateRemoteClients();
 		}
 		break;
 	}
@@ -1038,7 +994,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 					PopulateRoom(sc.rooms[proto_room.id()], &proto_room);
 			}
 
-			sc.roomsListReq.set_dirty();
+			sc.UpdateRooms();
 		}
 		break;
 	}
@@ -1133,7 +1089,7 @@ void ClientImpl::ConnectedAt(RakNet::SystemAddress addr)
 
 	SendProtocolMessageID(ID_SERVER_INFO_REQUEST, addr);
 	SendProtocolMessageID(ID_SERVER_STATUS_REQUEST, addr);
-	connectionsListReq.set_dirty();
+	UpdateConnections();
 }
 
 void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
@@ -1148,7 +1104,7 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 		sc.addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
 		sc.selfId = RemoteClient::UNASSIGNED_ID;
 		si.id = ServerConnection::UNASSIGNED_ID;
-		connectionsListReq.set_dirty();
+		UpdateConnections();
 
 		sc.requested = ClientParameters();
 
@@ -1157,10 +1113,10 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 		sc.ResetEntries();
 
 		sc.clients.clear();
-		sc.clientsListReq.set_dirty();
+		sc.UpdateRemoteClients();
 
 		sc.rooms.clear();
-		sc.roomsListReq.set_dirty();
+		sc.UpdateRooms();
 	}
 }
 
@@ -1188,7 +1144,7 @@ void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Cli
 			break;
 		}
 
-		sc.clientsListReq.set_dirty();
+		sc.UpdateRemoteClients();
 	}
 }
 
@@ -1204,7 +1160,7 @@ void ClientImpl::UpdateRoom(RakNet::SystemAddress addr, const Proto::Room* proto
 			sc.rooms.resize(id + 1);
 
 		PopulateRoom(sc.rooms[id], proto_room);
-		sc.roomsListReq.set_dirty();
+		sc.UpdateRooms();
 	}
 }
 
@@ -1241,6 +1197,42 @@ void ClientImpl::PopulateRoom(Room& room, const Proto::Room* proto_room)
 	for (std::size_t i = 0; i < room.slots.size(); i++) {
 		room.slots[i] = proto_room->joined_id_client(i);
 	}
+}
+
+void ClientImpl::UpdateDiscoverInfo()
+{
+	std::vector<ServerInfo>& back = serverListReq.back();
+	back.clear();
+
+	for (auto it = serverList.begin(); it != serverList.end(); it++)
+	{
+		if (it->second.valid)
+		{
+			back.push_back(it->second.data);
+			back.back().addr = it->first.ToString(false);
+			back.back().port = it->first.GetPort();
+		}
+	}
+
+	serverListReq.swap();
+}
+
+void ClientImpl::UpdateConnections()
+{
+	std::vector<ServerConnection>& back = connectionsListReq.back();
+	back.clear();
+
+	auto it = m_connections.begin(); it++;
+	for (; it != m_connections.end(); it++)
+	{
+		if (!it->isNull()) {
+			it->data.ping = m_peer->GetAveragePing(it->addr);
+			back.push_back(it->data);
+		}
+	}
+
+	connectionsListReq.swap();
+	RakNet::TimeMS m_lastDirtyDueTime = RakNet::GetTimeMS();
 }
 
 //---------------------------------------------------------------------------//
