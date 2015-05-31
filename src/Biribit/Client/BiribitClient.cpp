@@ -136,14 +136,15 @@ public:
 
 	Room::id_t joinedRoom;
 	std::uint32_t joinedSlot;
-	std::vector<Entry> joinedRoomEntries;
+
+	std::vector<RefSwap<Entry>> joinedRoomEntries;
 	std::mutex entriesMutex;
 
 	ServerConnectionPriv();
 
 	bool isNull();
+	unique<Proto::RoomEntriesRequest> UpdateEntries(Proto::RoomEntriesStatus* proto_entries);
 	const Entry& GetEntry(Entry::id_t id);
-	void SetEntry(Entry& entry);
 	void ResetEntries();
 
 	void UpdateRemoteClients();
@@ -164,24 +165,67 @@ bool ServerConnectionPriv::isNull()
 	return addr == RakNet::UNASSIGNED_SYSTEM_ADDRESS;
 }
 
+unique<Proto::RoomEntriesRequest> ServerConnectionPriv::UpdateEntries(Proto::RoomEntriesStatus* proto_entries)
+{
+	unique<Proto::RoomEntriesRequest> proto_entriesReq;
+	if (proto_entries->has_room_id() && joinedRoom == proto_entries->room_id())
+	{
+		if (proto_entries->has_journal_size())
+		{
+			//resize journal
+			std::uint32_t journal_size = proto_entries->journal_size();
+			{
+				std::lock_guard<std::mutex> lock(entriesMutex);
+				joinedRoomEntries.resize(journal_size);
+			}
+			
+			//saving entries in journal
+			int size = proto_entries->entries_size();
+			for (int i = 0; i < size; i++)
+			{
+				const Proto::RoomEntry& proto_entry = proto_entries->entries(i);
+				if (proto_entry.has_id() && proto_entry.has_from_slot() && proto_entry.has_entry_data())
+				{
+					std::uint32_t id = proto_entry.id();
+					if (id > Entry::UNASSIGNED_ID && id < journal_size)
+					{
+						RefSwap<Entry>& safe_entry = joinedRoomEntries[proto_entry.id()];
+						Entry& entry = safe_entry.back();
+						entry.id = proto_entry.id();
+						entry.from_slot = proto_entry.from_slot();
+						const std::string& data = proto_entry.entry_data();
+						entry.data.append(data.c_str(), data.length());
+						safe_entry.swap();
+					}
+				}
+			}
+
+			// finding out if there's more entries left to ask for
+			for (std::uint32_t i = 0; i < journal_size; i++)
+			{
+				if (!joinedRoomEntries[i].hasEverSwapped())
+				{
+					if (proto_entriesReq == nullptr)
+						proto_entriesReq = unique<Proto::RoomEntriesRequest>(new Proto::RoomEntriesRequest);
+					proto_entriesReq->add_entries_id(i);
+				}
+			}
+		}
+	}
+
+	return proto_entriesReq;
+}
+
 const Entry& ServerConnectionPriv::GetEntry(Entry::id_t id)
 {
 	{
 		std::lock_guard<std::mutex> lock(entriesMutex);
 		if (id > Entry::UNASSIGNED_ID && id < joinedRoomEntries.size())
-			return joinedRoomEntries[id];
+			return joinedRoomEntries[id].front(nullptr);
 	}
 
-	return Entry();
-}
-
-void ServerConnectionPriv::SetEntry(Entry& entry)
-{
-	std::lock_guard<std::mutex> lock(entriesMutex);
-	if (entry.id <= joinedRoomEntries.size())
-		joinedRoomEntries.resize(entry.id + 1);
-
-	joinedRoomEntries[entry.id] = std::move(entry);
+	static Entry dummy;
+	return dummy;
 }
 
 void ServerConnectionPriv::ResetEntries()
@@ -287,7 +331,7 @@ private:
 	void SendToRoom(ServerConnection::id_t id, shared<Packet> packet, Packet::ReliabilityBitmask mask);
 
 	void SendProtocolMessageID(RakNet::MessageID msg, const RakNet::AddressOrGUID systemIdentifier);
-	bool WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, ::google::protobuf::MessageLite& msg);
+	bool WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, const ::google::protobuf::MessageLite& msg);
 	template<typename T> bool ReadMessage(T& msg, RakNet::BitStream& bstream);
 	template<typename T> bool ReadMessage(T& msg, Packet& packet);
 
@@ -743,7 +787,7 @@ void ClientImpl::SendProtocolMessageID(RakNet::MessageID msg, const RakNet::Addr
 	m_peer->Send((const char*)tosend.getData(), (int)tosend.getDataSize(), LOW_PRIORITY, RELIABLE, 0, systemIdentifier, false);
 }
 
-bool ClientImpl::WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, ::google::protobuf::MessageLite& msg)
+bool ClientImpl::WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, const ::google::protobuf::MessageLite& msg)
 {
 	std::size_t size = (std::size_t) msg.ByteSize();
 	m_buffer.Ensure(size);
@@ -1059,7 +1103,35 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			m_receivedPending.push(std::move(recv));
 		}
 		break;
-	}	
+	}
+	case ID_JOURNAL_ENTRIES_REQUEST:
+		BIRIBIT_WARN("Nothing to do with ID_JOURNAL_ENTRIES_REQUEST");
+		break;
+	case ID_JOURNAL_ENTRIES_STATUS:
+	{
+		Proto::RoomEntriesStatus proto_entries;
+		if (ReadMessage(proto_entries, stream))
+		{
+			ServerInfoPriv& si = serverList[pPacket->systemAddress];
+			if (si.id != ServerConnection::UNASSIGNED_ID)
+			{
+				ServerConnectionPriv& sc = m_connections[si.id];
+				unique<Proto::RoomEntriesRequest> proto_entriesReq = sc.UpdateEntries(&proto_entries);
+				if (proto_entriesReq != nullptr)
+				{
+					Proto::RoomEntriesRequest* proto_entriesReqPtr = proto_entriesReq.release();
+					RakNet::BitStream bstream;
+					WriteMessage(bstream, ID_JOURNAL_ENTRIES_REQUEST, *proto_entriesReqPtr);
+					m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, sc.addr, false);
+					proto_entriesReq = unique<Proto::RoomEntriesRequest>(proto_entriesReqPtr);
+				}
+			}
+		}
+		break;
+	}
+	case ID_SEND_ENTRY_TO_ROOM:
+		BIRIBIT_WARN("Nothing to do with ID_JOURNAL_ENTRIES_REQUEST");
+		break;
 	default:
 		printLog("UNKNOWN PACKET IDENTIFIER");
 		break;

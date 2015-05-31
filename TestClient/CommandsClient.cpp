@@ -120,7 +120,7 @@ private:
 			server_listbox.clear();
 			server_listbox_str.clear();
 			for (auto it = discover_info.begin(); it != discover_info.end(); it++)
-				server_listbox_str.push_back(it->name + ", ping " + std::to_string(it->ping) + (it->passwordProtected ? ". Password protected." : ". No password."));
+				server_listbox_str.push_back(it->name + ". " + it->addr + ", ping " + std::to_string(it->ping) + (it->passwordProtected ? ".Password protected." : ".No password."));
 
 			for (auto it = server_listbox_str.begin(); it != server_listbox_str.end(); it++)
 				server_listbox.push_back(it->c_str());

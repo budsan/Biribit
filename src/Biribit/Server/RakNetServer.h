@@ -57,6 +57,10 @@ class RakNetServer
 			std::uint32_t from_slot;
 			std::size_t size;
 			char *data;
+
+			Entry();
+			~Entry();
+			void Alloc(std::size_t size);
 		};
 
 		std::vector<Entry> journal;
@@ -81,6 +85,8 @@ class RakNetServer
 	void RoomChanged(unique<Room>& room, RakNet::SystemAddress extra_addr_to_notify = RakNet::UNASSIGNED_SYSTEM_ADDRESS);
 
 	void SendRoomBroadcast(RakNet::SystemAddress addr, RakNet::Time timeStamp, RakNet::BitStream& in);
+	void SendRoomEntry(RakNet::SystemAddress addr, RakNet::BitStream& in);
+	void RoomEntriesRequest(RakNet::SystemAddress addr, Proto::RoomEntriesRequest* proto_entriesReq);
 
 	void PopulateProtoServerInfo(Proto::ServerInfo* proto_info);
 	void PopulateProtoClient(unique<Client>& client, Proto::Client* proto_client);

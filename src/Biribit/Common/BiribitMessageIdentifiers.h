@@ -71,8 +71,11 @@ enum BiribitMessageIDTypes
 	ID_JOURNAL_ENTRIES_REQUEST,
 	//cl -> sv: follows Proto::RoomEntriesRequest
 
-	ID_JOURNAL_ENTRIES_STATUS
+	ID_JOURNAL_ENTRIES_STATUS,
 	//sv -> cl: follows Proto::RoomEntriesStatus
+
+	ID_SEND_ENTRY_TO_ROOM
+	//cl -> sv: follows binary data
 };
 
 enum BiribitErrorTypes

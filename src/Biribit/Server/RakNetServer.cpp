@@ -30,7 +30,32 @@ RakNetServer::Room::Room()
 	: id(Room::UNASSIGNED_ID)
 	, joined_clients_count(0)
 {
+}
 
+RakNetServer::Room::Entry::Entry()
+	: from_slot(0)
+	, size(0)
+	, data(nullptr)
+{
+}
+
+RakNetServer::Room::Entry::~Entry()
+{
+	if (data != nullptr)
+		delete[] data;
+}
+
+void RakNetServer::Room::Entry::Alloc(std::size_t _size)
+{
+	if (data != nullptr)
+		delete[] data;
+	
+	if (_size > 0)
+		data = new char[size];
+	else
+		data = nullptr;
+	
+	size = _size;
 }
 
 const char* randomNames[] = {
@@ -376,12 +401,22 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 			client->joined_slot = slot;
 			printLog("Client (%d) \"%s\" joins room %d.", client->id, client->name.c_str(), room->id);
 			RoomChanged(room);
+
+			{
+				Proto::RoomJoin proto_join;
+				PopulateProtoRoomJoin(client, &proto_join);
+				RakNet::BitStream bstream;
+				if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
+					m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
+			}
+			{
+				Proto::RoomEntriesStatus proto_entries;
+				PopulateProtoRoomEntriesStatus(room, &proto_entries);
+				RakNet::BitStream bstream;
+				if (WriteMessage(bstream, ID_JOURNAL_ENTRIES_STATUS, proto_entries))
+					m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
+			}
 			
-			Proto::RoomJoin proto_join;
-			PopulateProtoRoomJoin(client, &proto_join);
-			RakNet::BitStream bstream;
-			if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
-				m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
 		}
 		else if (proto_join->has_slot_to_join() && client->joined_slot != proto_join->slot_to_join())
 		{
@@ -404,15 +439,21 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 
 			printLog("Client (%d) \"%s\" swaps slot from %d to %d in room %d.", client->id, client->name.c_str(), oldslot, slot, room->id);
 			RoomChanged(room);
-			
-			Proto::RoomJoin proto_join;
-			PopulateProtoRoomJoin(client, &proto_join);
-			RakNet::BitStream bstream;
-			if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
-				m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
 
-			Proto::RoomEntriesStatus proto_entries;
-			
+			{
+				Proto::RoomJoin proto_join;
+				PopulateProtoRoomJoin(client, &proto_join);
+				RakNet::BitStream bstream;
+				if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
+					m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
+			}
+			{
+				Proto::RoomEntriesStatus proto_entries;
+				PopulateProtoRoomEntriesStatus(room, &proto_entries);
+				RakNet::BitStream bstream;
+				if (WriteMessage(bstream, ID_JOURNAL_ENTRIES_STATUS, proto_entries))
+					m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
+			}
 		}
 	}
 }
@@ -480,6 +521,16 @@ void RakNetServer::SendRoomBroadcast(RakNet::SystemAddress addr, RakNet::Time ti
 		std::uint8_t uint8_reliability;
 		in.Read(uint8_reliability);
 		PacketReliability reliability = (PacketReliability) uint8_reliability;
+		switch (reliability)
+		{
+		case UNRELIABLE:
+		case RELIABLE:
+		case RELIABLE_ORDERED:
+			break;
+		default:
+			reliability = UNRELIABLE;
+			break;
+		}
 
 		RakNet::BitStream bstream;
 		if (timeStamp != 0)
@@ -498,6 +549,82 @@ void RakNetServer::SendRoomBroadcast(RakNet::SystemAddress addr, RakNet::Time ti
 				m_peer->Send(&bstream, HIGH_PRIORITY, reliability, room->id & 0xFF, m_clients[*it]->addr, false);
 			}
 		}
+	}
+}
+
+void RakNetServer::SendRoomEntry(RakNet::SystemAddress addr, RakNet::BitStream& in)
+{
+	unique<Client>& client = GetClient(addr);
+	if (client->joined_room > 0)
+	{
+		BIRIBIT_ASSERT(m_rooms[client->joined_room] != nullptr);
+		BIRIBIT_ASSERT(m_rooms[client->joined_room]->slots[client->joined_slot] == client->id);
+		unique<Room>& room = m_rooms[client->joined_room];
+
+		std::size_t size = BITS_TO_BYTES(in.GetNumberOfUnreadBits());
+		Room::Entry newEntry;
+		newEntry.from_slot = client->joined_slot;
+		newEntry.Alloc(size);
+		newEntry.data = new char[size];
+		in.Read(newEntry.data, size);
+		room->journal.push_back(newEntry);
+
+		Proto::RoomEntriesStatus proto_entries;
+		PopulateProtoRoomEntriesStatus(room, &proto_entries);
+		{
+			Proto::RoomEntry* proto_entry = proto_entries.add_entries();
+			proto_entry->set_id(room->journal.size() - 1);
+			proto_entry->set_from_slot(newEntry.from_slot);
+			proto_entry->set_entry_data(newEntry.data, newEntry.size);
+		}	
+
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_JOURNAL_ENTRIES_STATUS, proto_entries)) {
+			for (auto it = room->slots.begin(); it != room->slots.end(); it++) {
+				if (*it != Client::UNASSIGNED_ID) {
+					BIRIBIT_ASSERT(m_clients[*it] != nullptr);
+					m_peer->Send(&bstream, MEDIUM_PRIORITY, RELIABLE, room->id & 0xFF, m_clients[*it]->addr, false);
+				}
+			}
+		}
+	}
+}
+
+void RakNetServer::RoomEntriesRequest(RakNet::SystemAddress addr, Proto::RoomEntriesRequest* proto_entriesReq)
+{
+	unique<Client>& client = GetClient(addr);
+	if (client->joined_room > 0)
+	{
+		BIRIBIT_ASSERT(m_rooms[client->joined_room] != nullptr);
+		BIRIBIT_ASSERT(m_rooms[client->joined_room]->slots[client->joined_slot] == client->id);
+		unique<Room>& room = m_rooms[client->joined_room];
+
+		Proto::RoomEntriesStatus proto_entries;
+		PopulateProtoRoomEntriesStatus(room, &proto_entries);
+		
+		std::set<std::uint32_t> entriesSet;
+		int size = proto_entriesReq->entries_id_size();
+		for (int i = 0; i < size; i++)
+		{
+			std::uint32_t id = proto_entriesReq->entries_id(i);
+			if (entriesSet.find(id) != entriesSet.end())
+			{
+				if (id < room->journal.size())
+				{
+					Room::Entry& entry = room->journal[id];
+					Proto::RoomEntry* proto_entry = proto_entries.add_entries();
+					proto_entry->set_id(id);
+					proto_entry->set_from_slot(entry.from_slot);
+					proto_entry->set_entry_data(entry.data, entry.size);
+				}
+
+				entriesSet.insert(id);
+			}
+		}
+
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_JOURNAL_ENTRIES_STATUS, proto_entries))
+			m_peer->Send(&bstream, MEDIUM_PRIORITY, RELIABLE, room->id & 0xFF, addr, false);
 	}
 }
 
@@ -532,12 +659,8 @@ void RakNetServer::PopulateProtoRoomJoin(unique<Client>& client, Proto::RoomJoin
 
 void RakNetServer::PopulateProtoRoomEntriesStatus(unique<Room>& room, Proto::RoomEntriesStatus* proto_entries)
 {
-	//optional uint32 room_id = 1;
-	//optional uint32 journal_size = 2;
-	//repeated RoomEntry entries = 3;
-
 	proto_entries->set_room_id(room->id);
-	proto_entries->set_journal_size(room->slots.size());
+	proto_entries->set_journal_size(room->journal.size());
 }
 
 
@@ -701,6 +824,19 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		break;
 	case ID_BROADCAST_FROM_ROOM:
 		BIRIBIT_WARN("Nothing to do with ID_BROADCAST_FROM_ROOM");
+		break;
+	case ID_JOURNAL_ENTRIES_REQUEST:
+	{
+		Proto::RoomEntriesRequest proto_entriesReq;
+		if (ReadMessage(proto_entriesReq, stream))
+			RoomEntriesRequest(p->systemAddress, &proto_entriesReq);
+		break;
+	}
+	case ID_JOURNAL_ENTRIES_STATUS:
+		BIRIBIT_WARN("Nothing to do with ID_JOURNAL_ENTRIES_STATUS");
+		break;
+	case ID_SEND_ENTRY_TO_ROOM:
+		SendRoomBroadcast(p->systemAddress, timeStamp, stream);
 		break;
 	default:
 		break;
