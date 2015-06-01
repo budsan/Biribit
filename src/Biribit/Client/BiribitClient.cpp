@@ -91,6 +91,10 @@ Entry::Entry(Entry&& to_move)
 	this->operator=(std::move(to_move));
 }
 
+Entry::~Entry()
+{
+}
+
 Entry& Entry::operator=(Entry&& to_move)
 {
 	std::swap(id, to_move.id);
@@ -140,16 +144,21 @@ public:
 	std::vector<RefSwap<Entry>> joinedRoomEntries;
 	std::mutex entriesMutex;
 
+	static Entry EntryDummy;
+
 	ServerConnectionPriv();
 
 	bool isNull();
 	unique<Proto::RoomEntriesRequest> UpdateEntries(Proto::RoomEntriesStatus* proto_entries);
+	Entry::id_t GetEntriesCount();
 	const Entry& GetEntry(Entry::id_t id);
 	void ResetEntries();
 
 	void UpdateRemoteClients();
 	void UpdateRooms();
 };
+
+Entry ServerConnectionPriv::EntryDummy;
 
 ServerConnectionPriv::ServerConnectionPriv()
 	: addr(RakNet::UNASSIGNED_SYSTEM_ADDRESS)
@@ -176,7 +185,7 @@ unique<Proto::RoomEntriesRequest> ServerConnectionPriv::UpdateEntries(Proto::Roo
 			std::uint32_t journal_size = proto_entries->journal_size();
 			{
 				std::lock_guard<std::mutex> lock(entriesMutex);
-				joinedRoomEntries.resize(journal_size);
+				joinedRoomEntries.resize(journal_size + 1);
 			}
 			
 			//saving entries in journal
@@ -187,21 +196,21 @@ unique<Proto::RoomEntriesRequest> ServerConnectionPriv::UpdateEntries(Proto::Roo
 				if (proto_entry.has_id() && proto_entry.has_from_slot() && proto_entry.has_entry_data())
 				{
 					std::uint32_t id = proto_entry.id();
-					if (id > Entry::UNASSIGNED_ID && id < journal_size)
+					if (id > Entry::UNASSIGNED_ID && id <= journal_size)
 					{
 						RefSwap<Entry>& safe_entry = joinedRoomEntries[proto_entry.id()];
 						Entry& entry = safe_entry.back();
 						entry.id = proto_entry.id();
 						entry.from_slot = proto_entry.from_slot();
 						const std::string& data = proto_entry.entry_data();
-						entry.data.append(data.c_str(), data.length());
+						entry.data.append(data.c_str(), data.size());
 						safe_entry.swap();
 					}
 				}
 			}
 
 			// finding out if there's more entries left to ask for
-			for (std::uint32_t i = 0; i < journal_size; i++)
+			for (std::uint32_t i = 1; i < journal_size; i++)
 			{
 				if (!joinedRoomEntries[i].hasEverSwapped())
 				{
@@ -216,6 +225,17 @@ unique<Proto::RoomEntriesRequest> ServerConnectionPriv::UpdateEntries(Proto::Roo
 	return proto_entriesReq;
 }
 
+Entry::id_t ServerConnectionPriv::GetEntriesCount()
+{
+	if (joinedRoom > Room::UNASSIGNED_ID)
+	{
+		std::lock_guard<std::mutex> lock(entriesMutex);
+		return  joinedRoomEntries.size() - 1;
+	}
+
+	return Entry::UNASSIGNED_ID;
+}
+
 const Entry& ServerConnectionPriv::GetEntry(Entry::id_t id)
 {
 	{
@@ -224,8 +244,7 @@ const Entry& ServerConnectionPriv::GetEntry(Entry::id_t id)
 			return joinedRoomEntries[id].front(nullptr);
 	}
 
-	static Entry dummy;
-	return dummy;
+	return EntryDummy;
 }
 
 void ServerConnectionPriv::ResetEntries()
@@ -318,17 +337,24 @@ public:
 	Room::id_t GetJoinedRoomId(ServerConnection::id_t id);
 	std::uint32_t GetJoinedRoomSlot(ServerConnection::id_t id);
 
-	void SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask);
-	void SendToRoom(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask);
+	void SendBroadcast(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask);
+	void SendBroadcast(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask);
+
+	void SendEntry(ServerConnection::id_t id, const Packet& packet);
+	void SendEntry(ServerConnection::id_t id, const char* data, unsigned int lenght);
 
 	std::size_t GetDataSizeOfNextReceived();
 	std::unique_ptr<Received> PullReceived();
+
+	Entry::id_t GetEntriesCount(ServerConnection::id_t id);
+	const Entry& GetEntry(ServerConnection::id_t id, Entry::id_t entryId);
 
 private: 
 	RakNet::RakPeerInterface *m_peer;
 	unique<TaskPool> m_pool;
 
-	void SendToRoom(ServerConnection::id_t id, shared<Packet> packet, Packet::ReliabilityBitmask mask);
+	void SendBroadcast(ServerConnection::id_t id, shared<Packet> packet, Packet::ReliabilityBitmask mask);
+	void SendEntry(ServerConnection::id_t id, shared<Packet> packet);
 
 	void SendProtocolMessageID(RakNet::MessageID msg, const RakNet::AddressOrGUID systemIdentifier);
 	bool WriteMessage(RakNet::BitStream& bstream, RakNet::MessageID msgId, const ::google::protobuf::MessageLite& msg);
@@ -702,27 +728,27 @@ std::uint32_t ClientImpl::GetJoinedRoomSlot(ServerConnection::id_t id)
 	return m_connections[id].joinedSlot;
 }
 
-void ClientImpl::SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask)
+void ClientImpl::SendBroadcast(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask)
 {
 	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	shared<Packet> shared_packet(new Packet());
 	shared_packet->append(packet.getData(), packet.getDataSize());
-	SendToRoom(id, shared_packet, mask);
+	SendBroadcast(id, shared_packet, mask);
 }
 
-void ClientImpl::SendToRoom(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask)
+void ClientImpl::SendBroadcast(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask)
 {
 	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	shared<Packet> shared_packet(new Packet());
 	shared_packet->append(data, lenght);
-	SendToRoom(id, shared_packet, mask);
+	SendBroadcast(id, shared_packet, mask);
 }
 
-void ClientImpl::SendToRoom(ServerConnection::id_t id, shared<Packet> packet, Packet::ReliabilityBitmask mask = Packet::Unreliable)
+void ClientImpl::SendBroadcast(ServerConnection::id_t id, shared<Packet> packet, Packet::ReliabilityBitmask mask = Packet::Unreliable)
 {
 	shared<Packet> shared_packet = packet;
 	PacketReliability reliability;
@@ -757,7 +783,47 @@ void ClientImpl::SendToRoom(ServerConnection::id_t id, shared<Packet> packet, Pa
 
 		const char* data[2] = { (const char*)bstream.GetData(), (const char*)shared_packet->getData() };
 		int lengths[2] = { (int)bstream.GetNumberOfBytesUsed(), (int)shared_packet->getDataSize() };
-		m_peer->SendList(data, lengths, 2, MEDIUM_PRIORITY, reliability, id & 0xFF, conn.addr, false);
+		m_peer->SendList(data, lengths, 2, HIGH_PRIORITY, reliability, id & 0xFF, conn.addr, false);
+	});
+}
+
+void ClientImpl::SendEntry(ServerConnection::id_t id, const Packet& packet)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	shared<Packet> shared_packet(new Packet());
+	shared_packet->append(packet.getData(), packet.getDataSize());
+	SendEntry(id, shared_packet);
+}
+
+void ClientImpl::SendEntry(ServerConnection::id_t id, const char* data, unsigned int lenght)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return;
+
+	shared<Packet> shared_packet(new Packet());
+	shared_packet->append(data, lenght);
+	SendEntry(id, shared_packet);
+}
+
+void ClientImpl::SendEntry(ServerConnection::id_t id, shared<Packet> packet)
+{
+	shared<Packet> shared_packet = packet;
+	m_pool->enqueue([this, id, shared_packet]()
+	{
+		ServerConnectionPriv& conn = m_connections[id];
+		if (conn.isNull())
+			return;
+
+		RakNet::BitStream bstream;
+		bstream.Write((RakNet::MessageID) ID_TIMESTAMP);
+		bstream.Write(RakNet::GetTime());
+		bstream.Write((RakNet::MessageID) ID_SEND_ENTRY_TO_ROOM);
+
+		const char* data[2] = { (const char*)bstream.GetData(), (const char*)shared_packet->getData() };
+		int lengths[2] = { (int)bstream.GetNumberOfBytesUsed(), (int)shared_packet->getDataSize() };
+		m_peer->SendList(data, lengths, 2, MEDIUM_PRIORITY, RELIABLE, id & 0xFF, conn.addr, false);
 	});
 }
 
@@ -779,6 +845,22 @@ std::unique_ptr<Received> ClientImpl::PullReceived()
 	std::unique_ptr<Received> ptr = std::move(m_receivedPending.front());
 	m_receivedPending.pop();
 	return std::move(ptr);
+}
+
+Entry::id_t ClientImpl::GetEntriesCount(ServerConnection::id_t id)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return 0;
+
+	return m_connections[id].GetEntriesCount();
+}
+
+const Entry& ClientImpl::GetEntry(ServerConnection::id_t id, Entry::id_t entryId)
+{
+	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return ServerConnectionPriv::EntryDummy;
+
+	return m_connections[id].GetEntry(entryId);
 }
 
 void ClientImpl::SendProtocolMessageID(RakNet::MessageID msg, const RakNet::AddressOrGUID systemIdentifier)
@@ -1418,14 +1500,24 @@ std::uint32_t Client::GetJoinedRoomSlot(ServerConnection::id_t id)
 	return m_impl->GetJoinedRoomSlot(id);
 }
 
-void Client::SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask)
+void Client::SendBroadcast(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask)
 {
-	m_impl->SendToRoom(id, packet, mask);
+	m_impl->SendBroadcast(id, packet, mask);
 }
 
-void Client::SendToRoom(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask)
+void Client::SendBroadcast(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask)
 {
-	m_impl->SendToRoom(id, data, lenght, mask);
+	m_impl->SendBroadcast(id, data, lenght, mask);
+}
+
+void Client::SendEntry(ServerConnection::id_t id, const Packet& packet)
+{
+	m_impl->SendEntry(id, packet);
+}
+
+void Client::SendEntry(ServerConnection::id_t id, const char* data, unsigned int lenght)
+{
+	m_impl->SendEntry(id, data, lenght);
 }
 
 std::size_t Client::GetDataSizeOfNextReceived()
@@ -1436,6 +1528,16 @@ std::size_t Client::GetDataSizeOfNextReceived()
 std::unique_ptr<Received> Client::PullReceived()
 {
 	return m_impl->PullReceived();
+}
+
+Entry::id_t Client::GetEntriesCount(ServerConnection::id_t id)
+{
+	return m_impl->GetEntriesCount(id);
+}
+
+const Entry& Client::GetEntry(ServerConnection::id_t id, Entry::id_t entryId)
+{
+	return m_impl->GetEntry(id, entryId);
 }
 
 }

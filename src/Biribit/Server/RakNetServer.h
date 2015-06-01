@@ -54,13 +54,13 @@ class RakNetServer
 
 		struct Entry
 		{
+			typedef std::uint32_t id_t;
+			enum { UNASSIGNED_ID = 0 };
+
 			std::uint32_t from_slot;
-			std::size_t size;
-			char *data;
+			std::string data;
 
 			Entry();
-			~Entry();
-			void Alloc(std::size_t size);
 		};
 
 		std::vector<Entry> journal;

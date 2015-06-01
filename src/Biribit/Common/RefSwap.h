@@ -2,10 +2,11 @@
 
 #include <utility>
 #include <mutex>
+#include <memory>
 
 template<class T> class RefSwap
 {
-	T* ptr[2];
+	std::unique_ptr<T> ptr[2];
 	std::size_t sel;
 
 	std::mutex mutex;
@@ -13,25 +14,35 @@ template<class T> class RefSwap
 
 public:
 
+	RefSwap()
+		: sel(0)
+		, revision(0)
+	{
+		ptr[0] = std::unique_ptr<T>(new T());
+		ptr[1] = std::unique_ptr<T>(new T());
+	}
+
+	RefSwap(const RefSwap& other) = delete;
+	const RefSwap& operator=(const RefSwap& other) = delete;
+
 	RefSwap(RefSwap&& other)
 	{
-		ptr[0] = other.ptr[0];
-		ptr[1] = other.ptr[1];
-		sel = other.sel;
-		revision = revision;
+		std::swap(ptr[0], other.ptr[0]);
+		std::swap(ptr[1], other.ptr[1]);
+		std::swap(sel, other.sel);
+		std::swap(revision, other.revision);
 	}
 
 	template<class... Args> RefSwap(Args&&... args)
 		: sel(0)
 		, revision(0)
 	{
-		ptr[0] = new T(std::forward<Args>(args)...);
-		ptr[1] = new T(std::forward<Args>(args)...);
+		ptr[0] = std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+		ptr[1] = std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 	}
 
-	~RefSwap() {
-		delete ptr[0];
-		delete ptr[1];
+	~RefSwap()
+	{
 	}
 
 	const T& front(unsigned int* _revision) {

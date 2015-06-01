@@ -289,10 +289,16 @@ unsigned int brbt_GetJoinedRoomSlot(brbt_id_t client, brbt_id_t id_conn)
 	return cl->GetJoinedRoomSlot(id_conn);
 }
 
-void brbt_SendToRoom(brbt_id_t client, brbt_id_t id_con, const void* data, unsigned int size, brbt_ReliabilityBitmask mask)
+void brbt_SendBroadcast(brbt_id_t client, brbt_id_t id_con, const void* data, unsigned int size, brbt_ReliabilityBitmask mask)
 {
 	std::unique_ptr<Biribit::Client>& cl = clients[client];
-	cl->SendToRoom(id_con, (const char*) data, size, (Biribit::Packet::ReliabilityBitmask) mask);
+	cl->SendBroadcast(id_con, (const char*) data, size, (Biribit::Packet::ReliabilityBitmask) mask);
+}
+
+void brbt_SendEntry(brbt_id_t client, brbt_id_t id_con, const void* data, unsigned int size)
+{
+	std::unique_ptr<Biribit::Client>& cl = clients[client];
+	cl->SendEntry(id_con, (const char*)data, size);
 }
 
 unsigned int brbt_GetDataSizeOfNextReceived(brbt_id_t client)

@@ -91,10 +91,9 @@ struct API_EXPORT Entry
 
 	Entry();
 	Entry(Entry&&);
-	Entry(const Entry&) = delete;
+	~Entry();
 
-	Entry& operator=(Entry&&);	
-	const Entry& operator=(const Entry&) = delete;
+	Entry& operator=(Entry&&);
 };
 
 class ClientImpl;
@@ -134,11 +133,17 @@ public:
 	Room::id_t GetJoinedRoomId(ServerConnection::id_t id);
 	std::uint32_t GetJoinedRoomSlot(ServerConnection::id_t id);
 
-	void SendToRoom(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask = Packet::Unreliable);
-	void SendToRoom(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask = Packet::Unreliable);
+	void SendBroadcast(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask = Packet::Unreliable);
+	void SendBroadcast(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask = Packet::Unreliable);
+
+	void SendEntry(ServerConnection::id_t id, const Packet& packet);
+	void SendEntry(ServerConnection::id_t id, const char* data, unsigned int lenght);
 
 	std::size_t GetDataSizeOfNextReceived();
 	std::unique_ptr<Received> PullReceived();
+
+	Entry::id_t GetEntriesCount(ServerConnection::id_t id);
+	const Entry& GetEntry(ServerConnection::id_t id, Entry::id_t entryId);
 
 private:
 	ClientImpl* m_impl;

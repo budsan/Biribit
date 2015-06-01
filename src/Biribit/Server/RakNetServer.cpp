@@ -29,33 +29,13 @@ RakNetServer::Client::Client()
 RakNetServer::Room::Room()
 	: id(Room::UNASSIGNED_ID)
 	, joined_clients_count(0)
+	, journal(1)
 {
 }
 
 RakNetServer::Room::Entry::Entry()
 	: from_slot(0)
-	, size(0)
-	, data(nullptr)
 {
-}
-
-RakNetServer::Room::Entry::~Entry()
-{
-	if (data != nullptr)
-		delete[] data;
-}
-
-void RakNetServer::Room::Entry::Alloc(std::size_t _size)
-{
-	if (data != nullptr)
-		delete[] data;
-	
-	if (_size > 0)
-		data = new char[size];
-	else
-		data = nullptr;
-	
-	size = _size;
 }
 
 const char* randomNames[] = {
@@ -318,7 +298,6 @@ void RakNetServer::CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* pro
 	room->id = i;
 	room->appid = client->appid;
 	room->slots.resize(proto_create->client_slots(), Client::UNASSIGNED_ID);
-	room->journal.clear();
 
 	std::set<Room::id_t>& room_set = m_roomAppIdMap[room->appid];
 	auto result = room_set.insert(room->id);
@@ -564,9 +543,9 @@ void RakNetServer::SendRoomEntry(RakNet::SystemAddress addr, RakNet::BitStream& 
 		std::size_t size = BITS_TO_BYTES(in.GetNumberOfUnreadBits());
 		Room::Entry newEntry;
 		newEntry.from_slot = client->joined_slot;
-		newEntry.Alloc(size);
-		newEntry.data = new char[size];
-		in.Read(newEntry.data, size);
+		newEntry.data.resize(size + 1);
+		newEntry.data[size] = '\0';
+		in.Read(&newEntry.data[0], size);
 		room->journal.push_back(newEntry);
 
 		Proto::RoomEntriesStatus proto_entries;
@@ -575,7 +554,7 @@ void RakNetServer::SendRoomEntry(RakNet::SystemAddress addr, RakNet::BitStream& 
 			Proto::RoomEntry* proto_entry = proto_entries.add_entries();
 			proto_entry->set_id(room->journal.size() - 1);
 			proto_entry->set_from_slot(newEntry.from_slot);
-			proto_entry->set_entry_data(newEntry.data, newEntry.size);
+			proto_entry->set_entry_data(newEntry.data);
 		}	
 
 		RakNet::BitStream bstream;
@@ -609,13 +588,13 @@ void RakNetServer::RoomEntriesRequest(RakNet::SystemAddress addr, Proto::RoomEnt
 			std::uint32_t id = proto_entriesReq->entries_id(i);
 			if (entriesSet.find(id) != entriesSet.end())
 			{
-				if (id < room->journal.size())
+				if (id > Room::Entry::UNASSIGNED_ID && id < room->journal.size())
 				{
 					Room::Entry& entry = room->journal[id];
 					Proto::RoomEntry* proto_entry = proto_entries.add_entries();
 					proto_entry->set_id(id);
 					proto_entry->set_from_slot(entry.from_slot);
-					proto_entry->set_entry_data(entry.data, entry.size);
+					proto_entry->set_entry_data(entry.data);
 				}
 
 				entriesSet.insert(id);
@@ -660,7 +639,8 @@ void RakNetServer::PopulateProtoRoomJoin(unique<Client>& client, Proto::RoomJoin
 void RakNetServer::PopulateProtoRoomEntriesStatus(unique<Room>& room, Proto::RoomEntriesStatus* proto_entries)
 {
 	proto_entries->set_room_id(room->id);
-	proto_entries->set_journal_size(room->journal.size());
+	BIRIBIT_ASSERT(room->journal.size() > 0);
+	proto_entries->set_journal_size(room->journal.size() -1 );
 }
 
 
@@ -836,7 +816,7 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 		BIRIBIT_WARN("Nothing to do with ID_JOURNAL_ENTRIES_STATUS");
 		break;
 	case ID_SEND_ENTRY_TO_ROOM:
-		SendRoomBroadcast(p->systemAddress, timeStamp, stream);
+		SendRoomEntry(p->systemAddress, stream);
 		break;
 	default:
 		break;

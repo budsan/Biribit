@@ -117,7 +117,8 @@ API_C_EXPORT void brbt_JoinRoomAndSlot(brbt_id_t client, brbt_id_t id_conn, brbt
 API_C_EXPORT brbt_id_t brbt_GetJoinedRoomId(brbt_id_t client, brbt_id_t id_conn);
 API_C_EXPORT unsigned int brbt_GetJoinedRoomSlot(brbt_id_t client, brbt_id_t id_conn);
 
-API_C_EXPORT void brbt_SendToRoom(brbt_id_t client, brbt_id_t id_con, const void* data, unsigned int size, brbt_ReliabilityBitmask mask);
+API_C_EXPORT void brbt_SendBroadcast(brbt_id_t client, brbt_id_t id_con, const void* data, unsigned int size, brbt_ReliabilityBitmask mask);
+API_C_EXPORT void brbt_SendEntry(brbt_id_t client, brbt_id_t id_con, const void* data, unsigned int size);
 
 API_C_EXPORT unsigned int brbt_GetDataSizeOfNextReceived(brbt_id_t client);
 API_C_EXPORT const brbt_Received* brbt_PullReceived(brbt_id_t client);
