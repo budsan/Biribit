@@ -328,6 +328,13 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 	{
 		//Client just want to leave the room
 		something_changed = LeaveRoom(client);
+		{
+			Proto::RoomJoin proto_join;
+			PopulateProtoRoomJoin(client, &proto_join);
+			RakNet::BitStream bstream;
+			if (WriteMessage(bstream, ID_ROOM_JOIN_RESPONSE, proto_join))
+				m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
+		}
 	}
 	else
 	{

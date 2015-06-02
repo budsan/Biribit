@@ -70,18 +70,18 @@ struct brbt_context
 };
 
 // Useful in Unity for changing between scenes and keeping same instance.
-brbt_Client single_instance { NULL };
+brbt_Client single_instance = NULL;
 
 brbt_Client brbt_CreateClient()
 {
 	brbt_Client client;
-	client.ptr = (void*) new brbt_context();
+	client = (void*) new brbt_context();
 	return client;
 }
 
 brbt_Client brbt_GetClientInstance()
 {
-	if (single_instance.ptr == NULL)
+	if (single_instance == NULL)
 		single_instance = brbt_CreateClient();
 
 	return single_instance;
@@ -89,53 +89,53 @@ brbt_Client brbt_GetClientInstance()
 
 void brbt_DeleteClient(brbt_Client client)
 {
-	if (single_instance.ptr == client.ptr)
-		single_instance.ptr = NULL;
+	if (single_instance == client)
+		single_instance = NULL;
 
-	brbt_context* context = (brbt_context*) client.ptr;
+	brbt_context* context = (brbt_context*) client;
 	delete context;
 }
 
 void brbt_Connect(brbt_Client client, const char* addr, unsigned short port, const char* password)
 {
-	brbt_context* context = (brbt_context*)client.ptr;
+	brbt_context* context = (brbt_context*) client;
 	Biribit::Client* cl = &(context->client);
 	cl->Connect(addr, port, password);
 }
 
 void brbt_Disconnect(brbt_Client client, brbt_id_t id_con)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->Disconnect(id_con);
 }
 
 void brbt_DisconnectAll(brbt_Client client)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->Disconnect();
 }
 
 void brbt_DiscoverOnLan(brbt_Client client, unsigned short port)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->DiscoverOnLan(port);
 }
 
 void brbt_ClearDiscoverInfo(brbt_Client client)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->ClearDiscoverInfo();
 }
 
 void brbt_RefreshDiscoverInfo(brbt_Client client)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->RefreshDiscoverInfo();
 }
 
 const brbt_ServerInfo_array brbt_GetDiscoverInfo(brbt_Client client, unsigned int* revision)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	brbt_array& temp_array = context->GetDiscoverInfo_array;
 	std::vector<std::string>& temp_alloc = context->GetDiscoverInfo_alloc;
 
@@ -145,14 +145,18 @@ const brbt_ServerInfo_array brbt_GetDiscoverInfo(brbt_Client client, unsigned in
 	{
 		temp_alloc.clear();
 		brbt_ServerInfo* arr = temp_array.resize<brbt_ServerInfo>(client_result.size());
-		for (std::size_t i = 0; i < client_result.size(); i++)
-		{
-			// Alloc everything first. Pointers may change if vector reallocates.
+
+		// Alloc everything first. Pointers may change if vector reallocates.
+		for (std::size_t i = 0; i < client_result.size(); i++) {
 			std::size_t name_i = temp_alloc.size(); temp_alloc.push_back(client_result[i].name);
 			std::size_t addr_i = temp_alloc.size(); temp_alloc.push_back(client_result[i].addr);
+		}
 
-			arr[i].name = temp_alloc[name_i].c_str();
-			arr[i].addr = temp_alloc[addr_i].c_str();
+		std::size_t push_i = 0;
+		for (std::size_t i = 0; i < client_result.size(); i++)
+		{
+			arr[i].name = temp_alloc[push_i++].c_str();
+			arr[i].addr = temp_alloc[push_i++].c_str();
 			arr[i].ping = client_result[i].ping;
 			arr[i].port = client_result[i].port;
 			arr[i].passwordProtected = client_result[i].passwordProtected;
@@ -166,7 +170,7 @@ const brbt_ServerInfo_array brbt_GetDiscoverInfo(brbt_Client client, unsigned in
 
 const brbt_ServerConnection_array brbt_GetConnections(brbt_Client client, unsigned int* revision)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	brbt_array& temp_array = context->GetConnections_array;
 	std::vector<std::string>& temp_alloc = context->GetConnections_alloc;
 
@@ -176,13 +180,15 @@ const brbt_ServerConnection_array brbt_GetConnections(brbt_Client client, unsign
 	{
 		temp_alloc.clear();
 		brbt_ServerConnection* arr = temp_array.resize<brbt_ServerConnection>(client_result.size());
+
+		// Alloc everything first. Pointers may change if vector reallocates.
+		for (std::size_t i = 0; i < client_result.size(); i++)
+			temp_alloc.push_back(client_result[i].name);
+
 		for (std::size_t i = 0; i < client_result.size(); i++)
 		{
-			// Alloc everything first. Pointers may change if vector reallocates.
-			std::size_t name_i = temp_alloc.size(); temp_alloc.push_back(client_result[i].name);
-
 			arr[i].id = client_result[i].id;
-			arr[i].name = temp_alloc[name_i].c_str();
+			arr[i].name = temp_alloc[i].c_str();
 			arr[i].ping = client_result[i].ping;
 		}
 	}
@@ -194,7 +200,7 @@ const brbt_ServerConnection_array brbt_GetConnections(brbt_Client client, unsign
 
 const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_Client client, brbt_id_t id_conn, unsigned int* revision)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	brbt_array& temp_array = context->GetRemoteClients_array;
 	std::vector<std::string>& temp_alloc = context->GetRemoteClients_alloc;
 
@@ -204,15 +210,19 @@ const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_Client client, brbt_id_
 	{
 		temp_alloc.clear();
 		brbt_RemoteClient* arr = temp_array.resize<brbt_RemoteClient>(client_result.size());
+
+		// Alloc everything first. Pointers may change if vector reallocates.
+		for (std::size_t i = 0; i < client_result.size(); i++) {
+			temp_alloc.push_back(client_result[i].name);
+			temp_alloc.push_back(client_result[i].appid);
+		}
+
+		std::size_t push_i = 0;
 		for (std::size_t i = 0; i < client_result.size(); i++)
 		{
-			// Alloc everything first. Pointers may change if vector reallocates.
-			std::size_t name_i = temp_alloc.size(); temp_alloc.push_back(client_result[i].name);
-			std::size_t appid_i = temp_alloc.size(); temp_alloc.push_back(client_result[i].appid);
-
 			arr[i].id = client_result[i].id;
-			arr[i].name = temp_alloc[name_i].c_str();
-			arr[i].appid = temp_alloc[appid_i].c_str();
+			arr[i].name = temp_alloc[push_i++].c_str();
+			arr[i].appid = temp_alloc[push_i++].c_str();
 		}
 	}
 
@@ -223,13 +233,13 @@ const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_Client client, brbt_id_
 
 brbt_id_t brbt_GetLocalClientId(brbt_Client client, brbt_id_t id_conn)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	return cl->GetLocalClientId(id_conn);
 }
 
 void brbt_SetLocalClientParameters(brbt_Client client, brbt_id_t id_conn, brbt_ClientParameters _parameters)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	Biribit::ClientParameters parameters;
 	parameters.name = _parameters.name;
 	parameters.appid = _parameters.appid;
@@ -238,13 +248,13 @@ void brbt_SetLocalClientParameters(brbt_Client client, brbt_id_t id_conn, brbt_C
 
 void brbt_RefreshRooms(brbt_Client client, brbt_id_t id_conn)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->RefreshRooms(id_conn);
 }
 
 const brbt_Room_array brbt_GetRooms(brbt_Client client, brbt_id_t id_conn, unsigned int* revision)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	brbt_array& temp_array = context->GetRooms_array;
 	std::vector<std::vector<unsigned int>>& temp_alloc = context->GetRooms_alloc;
 
@@ -254,14 +264,15 @@ const brbt_Room_array brbt_GetRooms(brbt_Client client, brbt_id_t id_conn, unsig
 	{
 		temp_alloc.clear();
 		brbt_Room* arr = temp_array.resize<brbt_Room>(client_result.size());
-		for (std::size_t i = 0; i < client_result.size(); i++)
-		{
-			// Alloc everything first. Pointers may change if vector reallocates.
-			std::size_t slots_i = temp_alloc.size(); temp_alloc.push_back(client_result[i].slots);
 
+		// Alloc everything first. Pointers may change if vector reallocates.
+		for (std::size_t i = 0; i < client_result.size(); i++)
+			temp_alloc.push_back(client_result[i].slots);
+
+		for (std::size_t i = 0; i < client_result.size(); i++) {
 			arr[i].id = client_result[i].id;
-			arr[i].slots_size = client_result[i].slots.size();
-			arr[i].slots = &temp_alloc[slots_i].at(0);
+			arr[i].slots_size = temp_alloc[i].size();
+			arr[i].slots = &(temp_alloc[i].at(0));
 		}
 	}
 
@@ -272,67 +283,67 @@ const brbt_Room_array brbt_GetRooms(brbt_Client client, brbt_id_t id_conn, unsig
 
 void brbt_CreateRoom(brbt_Client client, brbt_id_t id_conn, unsigned int num_slots)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->CreateRoom(id_conn, num_slots);
 }
 
 void brbt_CreateRoomAndJoinSlot(brbt_Client client, brbt_id_t id_conn, unsigned int num_slots, unsigned int slot_to_join_id)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->CreateRoom(id_conn, num_slots, slot_to_join_id);
 }
 
 void brbt_JoinRandomOrCreateRoom(brbt_Client client, brbt_id_t id_conn, unsigned int num_slots)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->JoinRandomOrCreateRoom(id_conn, num_slots);
 }
 
 void brbt_JoinRoom(brbt_Client client, brbt_id_t id_conn, brbt_id_t room_id)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->JoinRoom(id_conn, room_id);
 }
 
 void brbt_JoinRoomAndSlot(brbt_Client client, brbt_id_t id_conn, brbt_id_t room_id, unsigned int slot_id)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->JoinRoom(id_conn, room_id, slot_id);
 }
 
 brbt_id_t brbt_GetJoinedRoomId(brbt_Client client, brbt_id_t id_conn)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	return cl->GetJoinedRoomId(id_conn);
 }
 
 unsigned int brbt_GetJoinedRoomSlot(brbt_Client client, brbt_id_t id_conn)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	return cl->GetJoinedRoomSlot(id_conn);
 }
 
 void brbt_SendBroadcast(brbt_Client client, brbt_id_t id_con, const void* data, unsigned int size, brbt_ReliabilityBitmask mask)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->SendBroadcast(id_con, (const char*) data, size, (Biribit::Packet::ReliabilityBitmask) mask);
 }
 
 void brbt_SendEntry(brbt_Client client, brbt_id_t id_con, const void* data, unsigned int size)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->SendEntry(id_con, (const char*)data, size);
 }
 
 unsigned int brbt_GetDataSizeOfNextReceived(brbt_Client client)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	return cl->GetDataSizeOfNextReceived();
 }
 
 const brbt_Received* brbt_PullReceived(brbt_Client client)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 
 	context->recv = cl->PullReceived();
 	if (context->recv != nullptr)
@@ -353,13 +364,13 @@ const brbt_Received* brbt_PullReceived(brbt_Client client)
 
 brbt_id_t brbt_GetEntriesCount(brbt_Client client, brbt_id_t id_con)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	return cl->GetEntriesCount(id_con);
 }
 
 const brbt_Entry* brbt_GetEntry(brbt_Client client, brbt_id_t id_con, brbt_id_t id_entry)
 {
-	brbt_context* context = (brbt_context*)client.ptr; Biribit::Client* cl = &(context->client);
+	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	const Biribit::Entry& entry = cl->GetEntry(id_con, id_entry);
 	if (entry.id != Biribit::Entry::UNASSIGNED_ID)
 	{

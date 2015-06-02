@@ -15,10 +15,7 @@ enum brbt_ReliabilityBitmask
 	brbt_ReliableOrdered = 3
 };
 
-struct brbt_Client
-{
-	void *ptr;
-};
+typedef void* brbt_Client;
 
 struct brbt_ServerInfo
 {

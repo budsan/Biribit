@@ -49,6 +49,7 @@ public:
 
 	const RefSwap& operator=(const RefSwap& other)
 	{
+		return *this;
 	}
 
 	const T& front(unsigned int* _revision) {

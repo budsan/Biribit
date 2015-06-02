@@ -60,8 +60,8 @@ void Log_Init()
 
 void Log_Destroy()
 {
-	callbacks().clear();
 	Log::DestroyThread();
+	callbacks().clear();
 }
 
 int Log_AddCallback(LogCallback _pCallback)
