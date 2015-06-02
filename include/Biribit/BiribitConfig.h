@@ -121,7 +121,7 @@
 
 		#endif
 
-	#define STDCALL
+	#define STDCALL __attribute__((stdcall))
 
 	#endif
 

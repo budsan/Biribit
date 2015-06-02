@@ -22,9 +22,6 @@ public:
 		ptr[1] = std::unique_ptr<T>(new T());
 	}
 
-	RefSwap(const RefSwap& other) = delete;
-	const RefSwap& operator=(const RefSwap& other) = delete;
-
 	RefSwap(RefSwap&& other)
 	{
 		std::swap(ptr[0], other.ptr[0]);
@@ -32,6 +29,11 @@ public:
 		std::swap(sel, other.sel);
 		std::swap(revision, other.revision);
 	}
+
+	RefSwap(const RefSwap& other) : RefSwap()
+	{
+	}
+
 
 	template<class... Args> RefSwap(Args&&... args)
 		: sel(0)
@@ -42,6 +44,10 @@ public:
 	}
 
 	~RefSwap()
+	{
+	}
+
+	const RefSwap& operator=(const RefSwap& other)
 	{
 	}
 
