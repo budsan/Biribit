@@ -321,11 +321,41 @@ const brbt_Received* brbt_PullReceived(brbt_id_t client)
 		st_recv.room_id = recv->room_id;
 		st_recv.slot_id = recv->slot_id;
 		st_recv.data_size = recv->data.getDataSize();
-		st_recv.data = (const char*)recv->data.getData();
+		st_recv.data = recv->data.getData();
 		return &st_recv;
 	}
 	else
 	{
 		return nullptr;
 	}	
+}
+
+brbt_id_t brbt_GetEntriesCount(brbt_id_t client, brbt_id_t id_con)
+{
+	std::unique_ptr<Biribit::Client>& cl = clients[client];
+	return cl->GetEntriesCount(id_con);
+}
+
+const brbt_Entry* brbt_GetEntry(brbt_id_t client, brbt_id_t id_con, brbt_id_t id_entry)
+{
+	static brbt_Entry st_entry;
+
+	std::unique_ptr<Biribit::Client>& cl = clients[client];
+	const Biribit::Entry& entry = cl->GetEntry(id_con, id_entry);
+	if (entry.id != Biribit::Entry::UNASSIGNED_ID)
+	{
+		st_entry.id = entry.id;
+		st_entry.slot_id = entry.from_slot;
+		st_entry.data_size = entry.data.getDataSize();
+		st_entry.data = entry.data.getData();
+	}
+	else
+	{
+		st_entry.id = Biribit::Entry::UNASSIGNED_ID;
+		st_entry.slot_id = 0;
+		st_entry.data_size = 0;
+		st_entry.data = nullptr;
+	}
+
+	return &st_entry;
 }

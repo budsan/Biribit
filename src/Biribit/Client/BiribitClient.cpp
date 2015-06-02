@@ -203,14 +203,14 @@ unique<Proto::RoomEntriesRequest> ServerConnectionPriv::UpdateEntries(Proto::Roo
 						entry.id = proto_entry.id();
 						entry.from_slot = proto_entry.from_slot();
 						const std::string& data = proto_entry.entry_data();
-						entry.data.append(data.c_str(), data.size());
+						entry.data.append(data.c_str(), data.size() - 1);
 						safe_entry.swap();
 					}
 				}
 			}
 
 			// finding out if there's more entries left to ask for
-			for (std::uint32_t i = 1; i < journal_size; i++)
+			for (std::uint32_t i = 1; i <= journal_size; i++)
 			{
 				if (!joinedRoomEntries[i].hasEverSwapped())
 				{

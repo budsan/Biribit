@@ -93,17 +93,40 @@ private:
 				pair.second.clear();
 			}
 
-			if (joinedRoom > Biribit::Room::UNASSIGNED_ID)
+			if (pair.first > Biribit::Room::UNASSIGNED_ID)
 			{
 				std::list<std::string>& connectionEntries = pair.second;
 				std::uint32_t count = client->GetEntriesCount(connectionId);
 				for (std::uint32_t i = connectionEntries.size() + 1; i <= count; i++)
 				{
 					const Biribit::Entry& entry = client->GetEntry(connectionId, i);
+					bool isPrintable = true;
+					const char* it = (const char*)entry.data.getData();
+					const char* itEnd = it + entry.data.getDataSize();
+
+					std::stringstream hex;
+					for (; it != itEnd; it++)
+					{
+						static char hexTable[] = "0123456789ABCDEF";
+						static char bytehex[3] = { '\0', '\0', '\0' };
+
+						bool ok = ((it + 1) == itEnd && (*it) == '\0') || isprint(*it);
+						isPrintable = ok && isPrintable;
+
+						bytehex[0] = hexTable[(*it & 0xF0) >> 4];
+						bytehex[1] = hexTable[(*it & 0x0F) >> 0];
+						hex << bytehex;
+					}
+
 					if (entry.id > Biribit::Entry::UNASSIGNED_ID)
 					{
 						std::stringstream ss;
-						ss << " [Player " << (std::uint32_t) entry.from_slot << "]: " << (const char*)entry.data.getData();
+						ss << "[Player " << (std::uint32_t) entry.from_slot << "]: ";
+						if (isPrintable)
+							ss << (const char*)entry.data.getData();
+						else
+							ss << "binary: " << hex.str();
+
 						connectionEntries.push_back(ss.str());
 					}
 					else
@@ -303,7 +326,7 @@ private:
 				if (ImGui::Button("Send") || Enter)
 				{
 					Biribit::Packet packet;
-					packet.append(chat, strlen(chat));
+					packet.append(chat, strlen(chat) + 1);
 					client->SendBroadcast(connectionId, packet);
 					chat[0] = '\0';
 				}
@@ -312,15 +335,15 @@ private:
 				if (ImGui::Button("As Entry"))
 				{
 					Biribit::Packet packet;
-					packet.append(chat, strlen(chat));
+					packet.append(chat, strlen(chat) + 1);
 					client->SendEntry(connectionId, packet);
 					chat[0] = '\0';
 				}
 
-				if (ImGui::Button("Entry test"))
+				if (ImGui::Button("Binary entry test"))
 				{
 					Biribit::Packet packet;
-					packet << 0 << 255 << 0 << 255;
+					packet << 0 << -1 << 0 << -1;
 					client->SendEntry(connectionId, packet);
 				}
 

@@ -586,7 +586,7 @@ void RakNetServer::RoomEntriesRequest(RakNet::SystemAddress addr, Proto::RoomEnt
 		for (int i = 0; i < size; i++)
 		{
 			std::uint32_t id = proto_entriesReq->entries_id(i);
-			if (entriesSet.find(id) != entriesSet.end())
+			if (entriesSet.find(id) == entriesSet.end())
 			{
 				if (id > Room::Entry::UNASSIGNED_ID && id < room->journal.size())
 				{

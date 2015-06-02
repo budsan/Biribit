@@ -84,6 +84,15 @@ struct brbt_Received
 	const void* data;
 };
 
+struct brbt_Entry
+{
+	
+	brbt_id_t id;
+	unsigned char slot_id;
+	unsigned int data_size;
+	const void* data;
+};
+
 API_C_EXPORT brbt_id_t brbt_CreateClient();
 API_C_EXPORT brbt_id_t brbt_GetClientInstance();
 API_C_EXPORT void brbt_DeleteClient(brbt_id_t client);
@@ -122,3 +131,6 @@ API_C_EXPORT void brbt_SendEntry(brbt_id_t client, brbt_id_t id_con, const void*
 
 API_C_EXPORT unsigned int brbt_GetDataSizeOfNextReceived(brbt_id_t client);
 API_C_EXPORT const brbt_Received* brbt_PullReceived(brbt_id_t client);
+
+API_C_EXPORT brbt_id_t brbt_GetEntriesCount(brbt_id_t client, brbt_id_t id_con);
+API_C_EXPORT const brbt_Entry* brbt_GetEntry(brbt_id_t client, brbt_id_t id_con, brbt_id_t id_entry);

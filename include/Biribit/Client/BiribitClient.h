@@ -86,7 +86,7 @@ struct API_EXPORT Entry
 	enum { UNASSIGNED_ID = 0 };
 
 	id_t id;
-	std::uint32_t from_slot;
+	std::uint8_t from_slot;
 	Packet data;
 
 	Entry();
