@@ -5,7 +5,11 @@ include_directories(
 )
 
 add_library(BiribitClient SHARED
+	ServerConnection.cpp
+	ServerInfo.cpp
 	BiribitClient.cpp
+	BiribitClientTypes.cpp
+	BiribitClientImpl.cpp
 	BiribitClientExports.cpp
 )
 
