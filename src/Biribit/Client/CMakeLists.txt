@@ -1,17 +1,25 @@
 cmake_minimum_required(VERSION 2.8.3)
 
+set(INCROOT ${PROJECT_SOURCE_DIR}/include/Biribit/Client)
+set(SRCROOT ${PROJECT_SOURCE_DIR}/src/Biribit/Client)
+
 include_directories(
     ${BIRIBIT_RAKNET_INCLUDE_PATH}
 )
 
-add_library(BiribitClient SHARED
-	ConnectionImpl.cpp
-	ServerInfoImpl.cpp
-	BiribitClient.cpp
-	BiribitClientTypes.cpp
-	BiribitClientImpl.cpp
-	BiribitClientExports.cpp
+set(SRC
+	${SRCROOT}/ConnectionImpl.cpp
+	${SRCROOT}/ServerInfoImpl.cpp
+	${SRCROOT}/BiribitClient.cpp
+	${INCROOT}/BiribitClient.h
+	${SRCROOT}/BiribitTypes.cpp
+	${INCROOT}/BiribitTypes.h
+	${SRCROOT}/BiribitClientImpl.cpp
+	${SRCROOT}/BiribitClientExports.cpp
+	${INCROOT}/BiribitClientExports.h
 )
+
+add_library(BiribitClient SHARED ${SRC})
 
 target_link_libraries(BiribitClient
 	BiribitCommon

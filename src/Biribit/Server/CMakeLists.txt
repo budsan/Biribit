@@ -6,7 +6,7 @@ include_directories(
 )
 
 add_executable(BiribitServer
-	${SYSTEM_LIB_CPPS}
+	RakNetServer.h
 	RakNetServer.cpp
 	main.cpp
 )

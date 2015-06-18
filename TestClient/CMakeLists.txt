@@ -4,15 +4,25 @@ add_definitions(-DENABLE_IMGUI)
 
 add_executable(TestClient
 	Commands.cpp
+	Commands.h
 	CommandsClient.cpp
 	Console.cpp
+	Console.h
 	ConsoleInterface.cpp
+	ConsoleInterface.h
 	Game.cpp
+	Game.h
 	imgui.cpp
+	imgui.h
 	imgui_impl_sdl2.cpp
+	imgui_impl_sdl2.h
+	OpenGL.h
 	SDLClient.cpp
 	SDLcpp.cpp
+	SDLcpp.h
 	Updater.cpp
+	Updater.h
+	utf8.h
 )
 
 if(SYS_OS_WINDOWS)
