@@ -15,7 +15,7 @@ ServerInfo::ServerInfo()
 
 //---------------------------------------------------------------------------//
 
-ServerConnection::ServerConnection() : id(ServerConnection::UNASSIGNED_ID)
+Connection::Connection() : id(Connection::UNASSIGNED_ID)
 {
 }
 
@@ -48,7 +48,7 @@ Room::Room()
 
 Received::Received()
 	: when(0)
-	, connection(ServerConnection::UNASSIGNED_ID)
+	, connection(Connection::UNASSIGNED_ID)
 	, room_id(Room::UNASSIGNED_ID)
 	, slot_id(0)
 	, data()

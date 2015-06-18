@@ -34,7 +34,7 @@ class ClientUpdater : public UpdaterListener
 	int rooms_listbox_current;
 	int slots;
 	int slots_to_join;
-	Biribit::ServerConnection::id_t connectionId;
+	Biribit::Connection::id_t connectionId;
 
 	std::vector<const char*> server_listbox;
 	std::vector<std::string> server_listbox_str;
@@ -45,8 +45,8 @@ class ClientUpdater : public UpdaterListener
 	std::vector<const char*> rooms_listbox;
 	std::vector<std::string> rooms_listbox_str;
 
-	std::map<Biribit::ServerConnection::id_t, std::list<std::string>> chats;
-	std::map<Biribit::ServerConnection::id_t, std::pair<Biribit::Room::id_t, std::list<std::string>>> entries;
+	std::map<Biribit::Connection::id_t, std::list<std::string>> chats;
+	std::map<Biribit::Connection::id_t, std::pair<Biribit::Room::id_t, std::list<std::string>>> entries;
 public:
 
 	ClientUpdater()
@@ -58,7 +58,7 @@ public:
 		, rooms_listbox_current(0)
 		, slots(4)
 		, slots_to_join(0)
-		, connectionId(Biribit::ServerConnection::UNASSIGNED_ID)
+		, connectionId(Biribit::Connection::UNASSIGNED_ID)
 	{
 		strcpy(addr, "localhost");
 		strcpy(pass, "");
@@ -84,7 +84,7 @@ private:
 			chats[recv->connection].push_back(ss.str());
 		}
 
-		if (connectionId != Biribit::ServerConnection::UNASSIGNED_ID)
+		if (connectionId != Biribit::Connection::UNASSIGNED_ID)
 		{
 			std::pair<Biribit::Room::id_t, std::list<std::string>>& pair = entries[connectionId];
 			Biribit::Room::id_t joinedRoom = client->GetJoinedRoomId(connectionId);
@@ -195,7 +195,7 @@ private:
 			}
 		}
 
-		const std::vector<Biribit::ServerConnection>& conns = client->GetConnections();
+		const std::vector<Biribit::Connection>& conns = client->GetConnections();
 		connections_listbox.clear();
 		connections_listbox_str.clear();
 		for (auto it = conns.begin(); it != conns.end(); it++)
@@ -207,14 +207,14 @@ private:
 
 		if (connections_listbox.empty())
 		{
-			connectionId = Biribit::ServerConnection::UNASSIGNED_ID;
+			connectionId = Biribit::Connection::UNASSIGNED_ID;
 		}
 		else
 		{
 			if (connections_listbox_current >= connections_listbox.size())
 				connections_listbox_current = 0;
 
-			const Biribit::ServerConnection& connection = conns[connections_listbox_current];
+			const Biribit::Connection& connection = conns[connections_listbox_current];
 			connectionId = connection.id;
 			if (ImGui::CollapsingHeader("Connections"))
 			{

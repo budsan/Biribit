@@ -20,7 +20,7 @@
 namespace Biribit
 {
 
-class ConnectionPriv
+class ConnectionImpl
 {
 public:
 	Connection data;
@@ -43,7 +43,7 @@ public:
 
 	static Entry EntryDummy;
 
-	ConnectionPriv();
+	ConnectionImpl();
 
 	bool isNull();
 	unique<Proto::RoomEntriesRequest> UpdateEntries(Proto::RoomEntriesStatus* proto_entries);

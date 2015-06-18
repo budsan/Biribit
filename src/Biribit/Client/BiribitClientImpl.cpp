@@ -106,9 +106,9 @@ void ClientImpl::Connect(const char* addr, unsigned short port, const char* pass
 	});
 }
 
-void ClientImpl::Disconnect(ServerConnection::id_t id)
+void ClientImpl::Disconnect(Connection::id_t id)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	m_pool->enqueue([this, id]()
@@ -147,7 +147,7 @@ void ClientImpl::RefreshDiscoverInfo()
 	{
 		for (auto it = serverList.begin(); it != serverList.end(); it++)
 		{
-			ServerInfoPriv& info = it->second;
+			ServerInfoImpl& info = it->second;
 			m_peer->Ping(it->first.ToString(false), it->first.GetPort(), false);
 			it->second.valid = false;
 		}
@@ -162,7 +162,7 @@ void ClientImpl::ClearDiscoverInfo()
 		auto it = serverList.begin();
 		while (it != serverList.end())
 		{
-			if (it->second.id == ServerConnection::UNASSIGNED_ID)
+			if (it->second.id == Connection::UNASSIGNED_ID)
 			{
 				it = serverList.erase(it);
 				modified = true;
@@ -181,37 +181,37 @@ const std::vector<ServerInfo>& ClientImpl::GetDiscoverInfo(std::uint32_t* revisi
 	return serverListReq.front(revision);
 }
 
-const std::vector<ServerConnection>& ClientImpl::GetConnections(std::uint32_t* revision)
+const std::vector<Connection>& ClientImpl::GetConnections(std::uint32_t* revision)
 {
 	return connectionsListReq.front(revision);
 }
 
-const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(ServerConnection::id_t id, std::uint32_t* revision)
+const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(Connection::id_t id, std::uint32_t* revision)
 {
 	static std::vector<RemoteClient> empty;
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return empty;
 
 	return m_connections[id].clientsListReq.front(revision);
 }
 
-RemoteClient::id_t ClientImpl::GetLocalClientId(ServerConnection::id_t id)
+RemoteClient::id_t ClientImpl::GetLocalClientId(Connection::id_t id)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return RemoteClient::UNASSIGNED_ID;
 
 	return m_connections[id].selfId;
 }
 
-void ClientImpl::SetLocalClientParameters(ServerConnection::id_t id, const ClientParameters& _parameters)
+void ClientImpl::SetLocalClientParameters(Connection::id_t id, const ClientParameters& _parameters)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	ClientParameters parameters = _parameters;
 	m_pool->enqueue([this, id, parameters]()
 	{
-		ServerConnectionPriv& conn = m_connections[id];
+		ConnectionImpl& conn = m_connections[id];
 		if (conn.isNull())
 			return;
 
@@ -228,35 +228,35 @@ void ClientImpl::SetLocalClientParameters(ServerConnection::id_t id, const Clien
 	});
 }
 
-void ClientImpl::RefreshRooms(ServerConnection::id_t id)
+void ClientImpl::RefreshRooms(Connection::id_t id)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	m_pool->enqueue([this, id]()
 	{
-		ServerConnectionPriv& conn = m_connections[id];
+		ConnectionImpl& conn = m_connections[id];
 		SendProtocolMessageID(ID_ROOM_LIST_REQUEST, conn.addr);
 	});
 }
 
-const std::vector<Room>& ClientImpl::GetRooms(ServerConnection::id_t id, std::uint32_t* revision)
+const std::vector<Room>& ClientImpl::GetRooms(Connection::id_t id, std::uint32_t* revision)
 {
 	static std::vector<Room> empty;
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return empty;
 
 	return m_connections[id].roomsListReq.front(revision);
 }
 
-void ClientImpl::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots)
+void ClientImpl::CreateRoom(Connection::id_t id, std::uint32_t num_slots)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	m_pool->enqueue([this, id, num_slots]()
 	{
-		ServerConnectionPriv& conn = m_connections[id];
+		ConnectionImpl& conn = m_connections[id];
 		if (conn.isNull())
 			return;
 
@@ -268,14 +268,14 @@ void ClientImpl::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots)
 	});
 }
 
-void ClientImpl::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id)
+void ClientImpl::CreateRoom(Connection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	m_pool->enqueue([this, id, num_slots, slot_to_join_id]()
 	{
-		ServerConnectionPriv& conn = m_connections[id];
+		ConnectionImpl& conn = m_connections[id];
 		if (conn.isNull())
 			return;
 
@@ -288,14 +288,14 @@ void ClientImpl::CreateRoom(ServerConnection::id_t id, std::uint32_t num_slots, 
 	});
 }
 
-void ClientImpl::JoinRandomOrCreateRoom(ServerConnection::id_t id, std::uint32_t num_slots)
+void ClientImpl::JoinRandomOrCreateRoom(Connection::id_t id, std::uint32_t num_slots)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	m_pool->enqueue([this, id, num_slots]()
 	{
-		ServerConnectionPriv& conn = m_connections[id];
+		ConnectionImpl& conn = m_connections[id];
 		if (conn.isNull())
 			return;
 
@@ -307,14 +307,14 @@ void ClientImpl::JoinRandomOrCreateRoom(ServerConnection::id_t id, std::uint32_t
 	});
 }
 
-void ClientImpl::JoinRoom(ServerConnection::id_t id, Room::id_t room_id)
+void ClientImpl::JoinRoom(Connection::id_t id, Room::id_t room_id)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	m_pool->enqueue([this, id, room_id]()
 	{
-		ServerConnectionPriv& conn = m_connections[id];
+		ConnectionImpl& conn = m_connections[id];
 		if (conn.isNull())
 			return;
 
@@ -326,14 +326,14 @@ void ClientImpl::JoinRoom(ServerConnection::id_t id, Room::id_t room_id)
 	});
 }
 
-void ClientImpl::JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::uint32_t slot_id)
+void ClientImpl::JoinRoom(Connection::id_t id, Room::id_t room_id, std::uint32_t slot_id)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	m_pool->enqueue([this, id, room_id, slot_id]()
 	{
-		ServerConnectionPriv& conn = m_connections[id];
+		ConnectionImpl& conn = m_connections[id];
 		if (conn.isNull())
 			return;
 
@@ -346,25 +346,25 @@ void ClientImpl::JoinRoom(ServerConnection::id_t id, Room::id_t room_id, std::ui
 	});
 }
 
-Room::id_t ClientImpl::GetJoinedRoomId(ServerConnection::id_t id)
+Room::id_t ClientImpl::GetJoinedRoomId(Connection::id_t id)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return RemoteClient::UNASSIGNED_ID;
 
 	return m_connections[id].joinedRoom;
 }
 
-std::uint32_t ClientImpl::GetJoinedRoomSlot(ServerConnection::id_t id)
+std::uint32_t ClientImpl::GetJoinedRoomSlot(Connection::id_t id)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return RemoteClient::UNASSIGNED_ID;
 
 	return m_connections[id].joinedSlot;
 }
 
-void ClientImpl::SendBroadcast(ServerConnection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask)
+void ClientImpl::SendBroadcast(Connection::id_t id, const Packet& packet, Packet::ReliabilityBitmask mask)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	shared<Packet> shared_packet(new Packet());
@@ -372,9 +372,9 @@ void ClientImpl::SendBroadcast(ServerConnection::id_t id, const Packet& packet, 
 	SendBroadcast(id, shared_packet, mask);
 }
 
-void ClientImpl::SendBroadcast(ServerConnection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask)
+void ClientImpl::SendBroadcast(Connection::id_t id, const char* data, unsigned int lenght, Packet::ReliabilityBitmask mask)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	shared<Packet> shared_packet(new Packet());
@@ -382,7 +382,7 @@ void ClientImpl::SendBroadcast(ServerConnection::id_t id, const char* data, unsi
 	SendBroadcast(id, shared_packet, mask);
 }
 
-void ClientImpl::SendBroadcast(ServerConnection::id_t id, shared<Packet> packet, Packet::ReliabilityBitmask mask = Packet::Unreliable)
+void ClientImpl::SendBroadcast(Connection::id_t id, shared<Packet> packet, Packet::ReliabilityBitmask mask = Packet::Unreliable)
 {
 	shared<Packet> shared_packet = packet;
 	PacketReliability reliability;
@@ -405,7 +405,7 @@ void ClientImpl::SendBroadcast(ServerConnection::id_t id, shared<Packet> packet,
 
 	m_pool->enqueue([this, id, shared_packet, reliability]()
 	{
-		ServerConnectionPriv& conn = m_connections[id];
+		ConnectionImpl& conn = m_connections[id];
 		if (conn.isNull())
 			return;
 
@@ -421,9 +421,9 @@ void ClientImpl::SendBroadcast(ServerConnection::id_t id, shared<Packet> packet,
 	});
 }
 
-void ClientImpl::SendEntry(ServerConnection::id_t id, const Packet& packet)
+void ClientImpl::SendEntry(Connection::id_t id, const Packet& packet)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	shared<Packet> shared_packet(new Packet());
@@ -431,9 +431,9 @@ void ClientImpl::SendEntry(ServerConnection::id_t id, const Packet& packet)
 	SendEntry(id, shared_packet);
 }
 
-void ClientImpl::SendEntry(ServerConnection::id_t id, const char* data, unsigned int lenght)
+void ClientImpl::SendEntry(Connection::id_t id, const char* data, unsigned int lenght)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
 
 	shared<Packet> shared_packet(new Packet());
@@ -441,12 +441,12 @@ void ClientImpl::SendEntry(ServerConnection::id_t id, const char* data, unsigned
 	SendEntry(id, shared_packet);
 }
 
-void ClientImpl::SendEntry(ServerConnection::id_t id, shared<Packet> packet)
+void ClientImpl::SendEntry(Connection::id_t id, shared<Packet> packet)
 {
 	shared<Packet> shared_packet = packet;
 	m_pool->enqueue([this, id, shared_packet]()
 	{
-		ServerConnectionPriv& conn = m_connections[id];
+		ConnectionImpl& conn = m_connections[id];
 		if (conn.isNull())
 			return;
 
@@ -481,18 +481,18 @@ std::unique_ptr<Received> ClientImpl::PullReceived()
 	return std::move(ptr);
 }
 
-Entry::id_t ClientImpl::GetEntriesCount(ServerConnection::id_t id)
+Entry::id_t ClientImpl::GetEntriesCount(Connection::id_t id)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return 0;
 
 	return m_connections[id].GetEntriesCount();
 }
 
-const Entry& ClientImpl::GetEntry(ServerConnection::id_t id, Entry::id_t entryId)
+const Entry& ClientImpl::GetEntry(Connection::id_t id, Entry::id_t entryId)
 {
-	if (id == ServerConnection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
-		return ServerConnectionPriv::EntryDummy;
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return ConnectionImpl::EntryDummy;
 
 	return m_connections[id].GetEntry(entryId);
 }
@@ -566,7 +566,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			Proto::ServerInfo proto_info;
 			if (ReadMessage(proto_info, stream))
 			{
-				ServerInfoPriv& si = serverList[pPacket->systemAddress];
+				ServerInfoImpl& si = serverList[pPacket->systemAddress];
 				PopulateServerInfo(si, &proto_info);
 				UpdateDiscoverInfo();
 			}
@@ -578,7 +578,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		RakNet::TimeMS current = RakNet::GetTimeMS();
 		stream.Read(pingTime);
 
-		ServerInfoPriv& si = serverList[pPacket->systemAddress];
+		ServerInfoImpl& si = serverList[pPacket->systemAddress];
 		si.data.ping = current - pingTime;
 		UpdateDiscoverInfo();
 
@@ -662,11 +662,11 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		Proto::ServerInfo proto_info;
 		if (ReadMessage(proto_info, stream))
 		{
-			ServerInfoPriv& si = serverList[pPacket->systemAddress];
+			ServerInfoImpl& si = serverList[pPacket->systemAddress];
 			PopulateServerInfo(si, &proto_info);
-			if (si.id != ServerConnection::UNASSIGNED_ID)
+			if (si.id != Connection::UNASSIGNED_ID)
 			{
-				ServerConnectionPriv& sc = m_connections[si.id];
+				ConnectionImpl& sc = m_connections[si.id];
 				sc.data.name = proto_info.name();
 				UpdateConnections();
 			}
@@ -691,9 +691,9 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		Proto::ServerStatus proto_status;
 		if (ReadMessage(proto_status, stream))
 		{
-			ServerInfoPriv& si = serverList[pPacket->systemAddress];
-			BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
-			ServerConnectionPriv& sc = m_connections[si.id];
+			ServerInfoImpl& si = serverList[pPacket->systemAddress];
+			BIRIBIT_ASSERT(si.id != Connection::UNASSIGNED_ID);
+			ConnectionImpl& sc = m_connections[si.id];
 
 			std::uint32_t max = 0;
 			int clients_size = proto_status.clients_size();
@@ -737,9 +737,9 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		Proto::RoomList proto_list;
 		if (ReadMessage(proto_list, stream))
 		{
-			ServerInfoPriv& si = serverList[pPacket->systemAddress];
-			BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
-			ServerConnectionPriv& sc = m_connections[si.id];
+			ServerInfoImpl& si = serverList[pPacket->systemAddress];
+			BIRIBIT_ASSERT(si.id != Connection::UNASSIGNED_ID);
+			ConnectionImpl& sc = m_connections[si.id];
 
 			std::uint32_t max = 0;
 			int rooms_size = proto_list.rooms_size();
@@ -776,9 +776,9 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		Proto::RoomJoin proto_join;
 		if (ReadMessage(proto_join, stream))
 		{
-			ServerInfoPriv& si = serverList[pPacket->systemAddress];
-			BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
-			ServerConnectionPriv& sc = m_connections[si.id];
+			ServerInfoImpl& si = serverList[pPacket->systemAddress];
+			BIRIBIT_ASSERT(si.id != Connection::UNASSIGNED_ID);
+			ConnectionImpl& sc = m_connections[si.id];
 			if (proto_join.has_id())
 			{
 				if (sc.joinedRoom != proto_join.id())
@@ -798,10 +798,10 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		break;
 	case ID_BROADCAST_FROM_ROOM:
 	{
-		ServerInfoPriv& si = serverList[pPacket->systemAddress];
-		if (si.id != ServerConnection::UNASSIGNED_ID)
+		ServerInfoImpl& si = serverList[pPacket->systemAddress];
+		if (si.id != Connection::UNASSIGNED_ID)
 		{
-			ServerConnectionPriv& sc = m_connections[si.id];
+			ConnectionImpl& sc = m_connections[si.id];
 			std::unique_ptr<Received> recv(new Received);
 			recv->connection = si.id;
 			recv->room_id = sc.joinedRoom;
@@ -828,10 +828,10 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		Proto::RoomEntriesStatus proto_entries;
 		if (ReadMessage(proto_entries, stream))
 		{
-			ServerInfoPriv& si = serverList[pPacket->systemAddress];
-			if (si.id != ServerConnection::UNASSIGNED_ID)
+			ServerInfoImpl& si = serverList[pPacket->systemAddress];
+			if (si.id != Connection::UNASSIGNED_ID)
 			{
-				ServerConnectionPriv& sc = m_connections[si.id];
+				ConnectionImpl& sc = m_connections[si.id];
 				unique<Proto::RoomEntriesRequest> proto_entriesReq = sc.UpdateEntries(&proto_entries);
 				if (proto_entriesReq != nullptr)
 				{
@@ -862,7 +862,7 @@ void ClientImpl::ConnectedAt(RakNet::SystemAddress addr)
 	{
 		if (m_connections[i].isNull())
 		{
-			ServerConnectionPriv& sc = m_connections[i];
+			ConnectionImpl& sc = m_connections[i];
 			sc.addr = addr;
 			sc.data.id = i;
 			break;
@@ -872,7 +872,7 @@ void ClientImpl::ConnectedAt(RakNet::SystemAddress addr)
 	if (i == m_connections.size())
 		return;
 
-	ServerInfoPriv& si = serverList[addr];
+	ServerInfoImpl& si = serverList[addr];
 	si.id = i;
 
 	SendProtocolMessageID(ID_SERVER_INFO_REQUEST, addr);
@@ -882,16 +882,16 @@ void ClientImpl::ConnectedAt(RakNet::SystemAddress addr)
 
 void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 {
-	ServerInfoPriv& si = serverList[addr];
-	if (si.id != ServerConnection::UNASSIGNED_ID)
+	ServerInfoImpl& si = serverList[addr];
+	if (si.id != Connection::UNASSIGNED_ID)
 	{
-		ServerConnectionPriv& sc = m_connections[si.id];
+		ConnectionImpl& sc = m_connections[si.id];
 		if (si.valid)
 			printLog("Disconnected from %s.", sc.data.name.c_str());
 
 		sc.addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
 		sc.selfId = RemoteClient::UNASSIGNED_ID;
-		si.id = ServerConnection::UNASSIGNED_ID;
+		si.id = Connection::UNASSIGNED_ID;
 		UpdateConnections();
 
 		sc.requested = ClientParameters();
@@ -910,9 +910,9 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 
 void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type)
 {
-	ServerInfoPriv& si = serverList[addr];
-	BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
-	ServerConnectionPriv& sc = m_connections[si.id];
+	ServerInfoImpl& si = serverList[addr];
+	BIRIBIT_ASSERT(si.id != Connection::UNASSIGNED_ID);
+	ConnectionImpl& sc = m_connections[si.id];
 	if (proto_client->has_id())
 	{
 		std::uint32_t id = proto_client->id();
@@ -938,9 +938,9 @@ void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Cli
 
 void ClientImpl::UpdateRoom(RakNet::SystemAddress addr, const Proto::Room* proto_room)
 {
-	ServerInfoPriv& si = serverList[addr];
-	BIRIBIT_ASSERT(si.id != ServerConnection::UNASSIGNED_ID);
-	ServerConnectionPriv& sc = m_connections[si.id];
+	ServerInfoImpl& si = serverList[addr];
+	BIRIBIT_ASSERT(si.id != Connection::UNASSIGNED_ID);
+	ConnectionImpl& sc = m_connections[si.id];
 	if (proto_room->has_id())
 	{
 		std::uint32_t id = proto_room->id();
@@ -952,7 +952,7 @@ void ClientImpl::UpdateRoom(RakNet::SystemAddress addr, const Proto::Room* proto
 	}
 }
 
-void ClientImpl::PopulateServerInfo(ServerInfoPriv& si, const Proto::ServerInfo* proto_info)
+void ClientImpl::PopulateServerInfo(ServerInfoImpl& si, const Proto::ServerInfo* proto_info)
 {
 	if (proto_info->has_name()){
 		si.data.name = proto_info->name();
@@ -1007,7 +1007,7 @@ void ClientImpl::UpdateDiscoverInfo()
 
 void ClientImpl::UpdateConnections()
 {
-	std::vector<ServerConnection>& back = connectionsListReq.back();
+	std::vector<Connection>& back = connectionsListReq.back();
 	back.clear();
 
 	auto it = m_connections.begin(); it++;

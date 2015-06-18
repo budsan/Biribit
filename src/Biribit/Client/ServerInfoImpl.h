@@ -5,13 +5,13 @@
 namespace Biribit
 {
 
-struct ServerInfoPriv
+struct ServerInfoImpl
 {
 	ServerInfo data;
-	ServerConnection::id_t id;
+	Connection::id_t id;
 	bool valid;
 
-	ServerInfoPriv();
+	ServerInfoImpl();
 };
 
 } // namespace Biribit

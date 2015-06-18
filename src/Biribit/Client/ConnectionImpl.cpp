@@ -1,11 +1,11 @@
-#include "ServerConnection.h"
+#include "ConnectionImpl.h"
 
 namespace Biribit
 {
 
-Entry ServerConnectionPriv::EntryDummy;
+Entry ConnectionImpl::EntryDummy;
 
-ServerConnectionPriv::ServerConnectionPriv()
+ConnectionImpl::ConnectionImpl()
 	: addr(RakNet::UNASSIGNED_SYSTEM_ADDRESS)
 	, selfId(RemoteClient::UNASSIGNED_ID)
 	, joinedRoom(Room::UNASSIGNED_ID)
@@ -14,12 +14,12 @@ ServerConnectionPriv::ServerConnectionPriv()
 {
 }
 
-bool ServerConnectionPriv::isNull()
+bool ConnectionImpl::isNull()
 {
 	return addr == RakNet::UNASSIGNED_SYSTEM_ADDRESS;
 }
 
-unique<Proto::RoomEntriesRequest> ServerConnectionPriv::UpdateEntries(Proto::RoomEntriesStatus* proto_entries)
+unique<Proto::RoomEntriesRequest> ConnectionImpl::UpdateEntries(Proto::RoomEntriesStatus* proto_entries)
 {
 	unique<Proto::RoomEntriesRequest> proto_entriesReq;
 	if (proto_entries->has_room_id() && joinedRoom == proto_entries->room_id())
@@ -70,7 +70,7 @@ unique<Proto::RoomEntriesRequest> ServerConnectionPriv::UpdateEntries(Proto::Roo
 	return proto_entriesReq;
 }
 
-Entry::id_t ServerConnectionPriv::GetEntriesCount()
+Entry::id_t ConnectionImpl::GetEntriesCount()
 {
 	if (joinedRoom > Room::UNASSIGNED_ID)
 	{
@@ -81,7 +81,7 @@ Entry::id_t ServerConnectionPriv::GetEntriesCount()
 	return Entry::UNASSIGNED_ID;
 }
 
-const Entry& ServerConnectionPriv::GetEntry(Entry::id_t id)
+const Entry& ConnectionImpl::GetEntry(Entry::id_t id)
 {
 	{
 		std::lock_guard<std::mutex> lock(entriesMutex);
@@ -92,13 +92,13 @@ const Entry& ServerConnectionPriv::GetEntry(Entry::id_t id)
 	return EntryDummy;
 }
 
-void ServerConnectionPriv::ResetEntries()
+void ConnectionImpl::ResetEntries()
 {
 	std::lock_guard<std::mutex> lock(entriesMutex);
 	joinedRoomEntries.resize(1);
 }
 
-void ServerConnectionPriv::UpdateRemoteClients()
+void ConnectionImpl::UpdateRemoteClients()
 {
 	std::vector<RemoteClient>& back = clientsListReq.back();
 	back.clear();
@@ -110,7 +110,7 @@ void ServerConnectionPriv::UpdateRemoteClients()
 	clientsListReq.swap();
 }
 
-void ServerConnectionPriv::UpdateRooms()
+void ConnectionImpl::UpdateRooms()
 {
 	std::vector<Room>& back = roomsListReq.back();
 	back.clear();

@@ -24,7 +24,7 @@ struct API_EXPORT ServerInfo
 	ServerInfo();
 };
 
-struct API_EXPORT ServerConnection
+struct API_EXPORT Connection
 {
 	typedef std::uint32_t id_t;
 	enum { UNASSIGNED_ID = 0 };
@@ -33,7 +33,7 @@ struct API_EXPORT ServerConnection
 	std::string name;
 	std::uint32_t ping;
 
-	ServerConnection();
+	Connection();
 };
 
 struct API_EXPORT RemoteClient
@@ -71,7 +71,7 @@ struct API_EXPORT Room
 struct API_EXPORT Received
 {
 	TimeMS when;
-	ServerConnection::id_t connection;
+	Connection::id_t connection;
 	Room::id_t room_id;
 	std::uint8_t slot_id;
 	Packet data;

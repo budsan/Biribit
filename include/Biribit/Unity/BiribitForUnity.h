@@ -32,16 +32,16 @@ struct brbt_ServerInfo_array
 	unsigned int size;
 };
 
-struct brbt_ServerConnection
+struct brbt_Connection
 {
 	brbt_id_t id;
 	const char* name;
 	unsigned int ping;
 };
 
-struct brbt_ServerConnection_array
+struct brbt_Connection_array
 {
-	brbt_ServerConnection* arr;
+	brbt_Connection* arr;
 	unsigned int size;
 };
 
@@ -110,7 +110,7 @@ API_C_EXPORT void brbt_ClearDiscoverInfo(brbt_Client client);
 API_C_EXPORT void brbt_RefreshDiscoverInfo(brbt_Client client);
 
 API_C_EXPORT const brbt_ServerInfo_array brbt_GetDiscoverInfo(brbt_Client client, unsigned int* revision);
-API_C_EXPORT const brbt_ServerConnection_array brbt_GetConnections(brbt_Client client, unsigned int* revision);
+API_C_EXPORT const brbt_Connection_array brbt_GetConnections(brbt_Client client, unsigned int* revision);
 API_C_EXPORT const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_Client client, brbt_id_t id_conn, unsigned int* revision);
 
 API_C_EXPORT brbt_id_t brbt_GetLocalClientId(brbt_Client client, brbt_id_t id_conn);

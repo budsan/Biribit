@@ -168,7 +168,7 @@ const brbt_ServerInfo_array brbt_GetDiscoverInfo(brbt_Client client, unsigned in
 	return temp_array.convert<brbt_ServerInfo_array>();
 }
 
-const brbt_ServerConnection_array brbt_GetConnections(brbt_Client client, unsigned int* revision)
+const brbt_Connection_array brbt_GetConnections(brbt_Client client, unsigned int* revision)
 {
 	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	brbt_array& temp_array = context->GetConnections_array;
@@ -179,7 +179,7 @@ const brbt_ServerConnection_array brbt_GetConnections(brbt_Client client, unsign
 	if (temp_array.revision_check(rev))
 	{
 		temp_alloc.clear();
-		brbt_ServerConnection* arr = temp_array.resize<brbt_ServerConnection>(client_result.size());
+		brbt_Connection* arr = temp_array.resize<brbt_Connection>(client_result.size());
 
 		// Alloc everything first. Pointers may change if vector reallocates.
 		for (std::size_t i = 0; i < client_result.size(); i++)
@@ -195,7 +195,7 @@ const brbt_ServerConnection_array brbt_GetConnections(brbt_Client client, unsign
 
 	if (revision != nullptr)
 		*revision = rev;
-	return temp_array.convert<brbt_ServerConnection_array>();
+	return temp_array.convert<brbt_Connection_array>();
 }
 
 const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_Client client, brbt_id_t id_conn, unsigned int* revision)
