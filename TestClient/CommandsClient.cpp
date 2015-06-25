@@ -160,22 +160,29 @@ private:
 		if (ImGui::CollapsingHeader("Servers"))
 		{
 
-			if (ImGui::Button("Discover in LAN"))
-				client->DiscoverOnLan();
+			if (ImGui::Button("Discover on LAN"))
+				client->DiscoverServersOnLAN();
 
 			ImGui::SameLine();
 			if (ImGui::Button("Clear list of servers"))
-				client->ClearDiscoverInfo();
+				client->ClearServerList();
 
 			ImGui::SameLine();
 			if (ImGui::Button("Refresh servers"))
-				client->RefreshDiscoverInfo();
+				client->RefreshServerList();
 
-			const std::vector<Biribit::ServerInfo>& discover_info = client->GetDiscoverInfo();
+			const std::vector<Biribit::ServerInfo>& discover_info = client->GetServerList();
 			server_listbox.clear();
 			server_listbox_str.clear();
-			for (auto it = discover_info.begin(); it != discover_info.end(); it++)
-				server_listbox_str.push_back(it->name + ". " + it->addr + ", ping " + std::to_string(it->ping) + (it->passwordProtected ? ".Password protected." : ".No password."));
+			for (auto it = discover_info.begin(); it != discover_info.end(); it++) {
+				std::stringstream str;
+				str << it->name << " (" << it->connected_clients << "/" << it->max_clients << "). ";
+				str << it->addr << ". Ping: " << it->ping << ". ";
+				if (it->passwordProtected)
+					str << "Password protected.";
+
+				server_listbox_str.push_back(str.str());
+			}
 
 			for (auto it = server_listbox_str.begin(); it != server_listbox_str.end(); it++)
 				server_listbox.push_back(it->c_str());
@@ -413,8 +420,8 @@ bool command_lookforservers(std::stringstream &in, std::stringstream &out, void*
 	if (port < 0 && port > 0xFFFF)
 		port = 0;
 
-	std::cerr << "DiscoverOnLan" << std::endl;
-	updater.GetClient()->DiscoverOnLan(port);
+	std::cerr << "DiscoverServersOnLAN" << std::endl;
+	updater.GetClient()->DiscoverServersOnLAN(port);
 
 	return true;
 }

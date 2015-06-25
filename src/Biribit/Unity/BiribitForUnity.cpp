@@ -52,8 +52,8 @@ struct brbt_context
 {
 	Biribit::Client client;
 
-	brbt_array GetDiscoverInfo_array;
-	std::vector<std::string> GetDiscoverInfo_alloc;
+	brbt_array GetServerList_array;
+	std::vector<std::string> GetServerList_alloc;
 
 	brbt_array GetConnections_array;
 	std::vector<std::string> GetConnections_alloc;
@@ -115,32 +115,32 @@ void brbt_DisconnectAll(brbt_Client client)
 	cl->Disconnect();
 }
 
-void brbt_DiscoverOnLan(brbt_Client client, unsigned short port)
+void brbt_DiscoverServersOnLAN(brbt_Client client, unsigned short port)
 {
 	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
-	cl->DiscoverOnLan(port);
+	cl->DiscoverServersOnLAN(port);
 }
 
-void brbt_ClearDiscoverInfo(brbt_Client client)
+void brbt_ClearServerList(brbt_Client client)
 {
 	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
-	cl->ClearDiscoverInfo();
+	cl->ClearServerList();
 }
 
-void brbt_RefreshDiscoverInfo(brbt_Client client)
+void brbt_RefreshServerList(brbt_Client client)
 {
 	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
-	cl->RefreshDiscoverInfo();
+	cl->RefreshServerList();
 }
 
-const brbt_ServerInfo_array brbt_GetDiscoverInfo(brbt_Client client, unsigned int* revision)
+const brbt_ServerInfo_array brbt_GetServerList(brbt_Client client, unsigned int* revision)
 {
 	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
-	brbt_array& temp_array = context->GetDiscoverInfo_array;
-	std::vector<std::string>& temp_alloc = context->GetDiscoverInfo_alloc;
+	brbt_array& temp_array = context->GetServerList_array;
+	std::vector<std::string>& temp_alloc = context->GetServerList_alloc;
 
 	unsigned int rev;
-	auto client_result = cl->GetDiscoverInfo(&rev);
+	auto client_result = cl->GetServerList(&rev);
 	if (temp_array.revision_check(rev))
 	{
 		temp_alloc.clear();

@@ -21,6 +21,7 @@ class RakNetServer
 {
 	RakNet::RakPeerInterface *m_peer;
 	std::string m_name;
+	unsigned int m_maxClients;
 	bool m_passwordProtected;
 
 	struct Client
@@ -110,7 +111,7 @@ public:
 
 	RakNetServer();
 
-	bool Run(unsigned short port = 0, const char* name = NULL, const char* password = NULL);
+	bool Run(unsigned short port = 0, const char* name = NULL, const char* password = NULL, unsigned int maxClients = 0);
 	bool isRunning();
 	bool Close();
 };

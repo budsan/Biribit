@@ -9,7 +9,7 @@
 #include <MessageIdentifiers.h>
 
 const unsigned short SERVER_DEFAULT_PORT = 8287;
-const unsigned int   SERVER_MAX_NUM_CLIENTS = 42;
+const unsigned int   SERVER_DEFAULT_MAX_CONNECTIONS = 32;
 const unsigned int   CLIENT_MAX_CONNECTIONS = 8;
 
 enum BiribitMessageIDTypes
@@ -78,6 +78,7 @@ enum BiribitMessageIDTypes
 	//cl -> sv: follows binary data
 };
 
+
 enum BiribitErrorTypes
 {
 	ERROR_CODE = 0,
@@ -93,3 +94,4 @@ enum BiribitErrorTypes
 	WARN_CANNOT_JOIN_TO_INVALID_SLOT,
 	WARN_CANNOT_JOIN_TO_FULL_ROOM
 };
+

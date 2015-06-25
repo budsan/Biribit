@@ -10,6 +10,8 @@ ServerInfo::ServerInfo()
 	, ping(0)
 	, port(0)
 	, passwordProtected(false)
+	, max_clients(0)
+	, connected_clients(0)
 {
 }
 

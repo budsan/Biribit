@@ -23,11 +23,11 @@ public:
 	void Disconnect(Connection::id_t id);
 	void Disconnect();
 
-	void DiscoverOnLan(unsigned short port = 0);
-	void ClearDiscoverInfo();
-	void RefreshDiscoverInfo();
+	void DiscoverServersOnLAN(unsigned short port = 0);
+	void ClearServerList();
+	void RefreshServerList();
 
-	const std::vector<ServerInfo>& GetDiscoverInfo(std::uint32_t* revision = nullptr);
+	const std::vector<ServerInfo>& GetServerList(std::uint32_t* revision = nullptr);
 	const std::vector<Connection>& GetConnections(std::uint32_t* revision = nullptr);
 	const std::vector<RemoteClient>& GetRemoteClients(Connection::id_t id, std::uint32_t* revision = nullptr);
 

@@ -28,24 +28,24 @@ void Client::Disconnect()
 	m_impl->Disconnect();
 }
 
-void Client::DiscoverOnLan(unsigned short port)
+void Client::DiscoverServersOnLAN(unsigned short port)
 {
-	m_impl->DiscoverOnLan(port);
+	m_impl->DiscoverServersOnLAN(port);
 }
 
-void Client::ClearDiscoverInfo()
+void Client::ClearServerList()
 {
-	m_impl->ClearDiscoverInfo();
+	m_impl->ClearServerList();
 }
 
-void Client::RefreshDiscoverInfo()
+void Client::RefreshServerList()
 {
-	m_impl->RefreshDiscoverInfo();
+	m_impl->RefreshServerList();
 }
 
-const std::vector<ServerInfo>& Client::GetDiscoverInfo(std::uint32_t* revision)
+const std::vector<ServerInfo>& Client::GetServerList(std::uint32_t* revision)
 {
-	return m_impl->GetDiscoverInfo(revision);
+	return m_impl->GetServerList(revision);
 }
 
 const std::vector<Connection>& Client::GetConnections(std::uint32_t* revision)

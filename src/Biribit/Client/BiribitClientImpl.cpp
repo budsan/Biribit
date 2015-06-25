@@ -130,7 +130,7 @@ void ClientImpl::Disconnect()
 	});
 }
 
-void ClientImpl::DiscoverOnLan(unsigned short port)
+void ClientImpl::DiscoverServersOnLAN(unsigned short port)
 {
 	if (port == 0)
 		port = SERVER_DEFAULT_PORT;
@@ -141,7 +141,7 @@ void ClientImpl::DiscoverOnLan(unsigned short port)
 	});
 }
 
-void ClientImpl::RefreshDiscoverInfo()
+void ClientImpl::RefreshServerList()
 {
 	m_pool->enqueue([this]()
 	{
@@ -154,7 +154,7 @@ void ClientImpl::RefreshDiscoverInfo()
 	});
 }
 
-void ClientImpl::ClearDiscoverInfo()
+void ClientImpl::ClearServerList()
 {
 	m_pool->enqueue([this]()
 	{
@@ -176,7 +176,7 @@ void ClientImpl::ClearDiscoverInfo()
 	});
 }
 
-const std::vector<ServerInfo>& ClientImpl::GetDiscoverInfo(std::uint32_t* revision)
+const std::vector<ServerInfo>& ClientImpl::GetServerList(std::uint32_t* revision)
 {
 	return serverListReq.front(revision);
 }
@@ -961,6 +961,12 @@ void ClientImpl::PopulateServerInfo(ServerInfoImpl& si, const Proto::ServerInfo*
 
 	if (proto_info->has_password_protected())
 		si.data.passwordProtected = proto_info->password_protected();
+
+	if (proto_info->has_max_clients())
+		si.data.max_clients = proto_info->max_clients();
+
+	if (proto_info->has_connected_clients())
+		si.data.connected_clients = proto_info->connected_clients();
 }
 
 void ClientImpl::PopulateRemoteClient(RemoteClient& remote, const Proto::Client* proto_client)

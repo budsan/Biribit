@@ -9,12 +9,15 @@ include_directories(
 
 set(SRC
 	${SRCROOT}/ConnectionImpl.cpp
+	${SRCROOT}/ConnectionImpl.h
 	${SRCROOT}/ServerInfoImpl.cpp
+	${SRCROOT}/ServerInfoImpl.h
 	${SRCROOT}/BiribitClient.cpp
 	${INCROOT}/BiribitClient.h
 	${SRCROOT}/BiribitTypes.cpp
 	${INCROOT}/BiribitTypes.h
 	${SRCROOT}/BiribitClientImpl.cpp
+	${SRCROOT}/BiribitClientImpl.h
 	${SRCROOT}/BiribitClientExports.cpp
 	${INCROOT}/BiribitClientExports.h
 )

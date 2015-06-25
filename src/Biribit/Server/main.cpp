@@ -223,6 +223,9 @@ int main(int argc, char** argv)
 		TCLAP::ValueArg<std::string> nameArg2("w", "password", "Server password", false, "", "password");
 		cmd.add(nameArg2);
 
+		TCLAP::ValueArg<std::string> nameArg3("m", "maxclients", "Max clients can connect", false, "", "maxclients");
+		cmd.add(nameArg3);
+
 #ifdef SYSTEM_LINUX
 		TCLAP::ValueArg<std::string> nameArgPID("i", "pidfile", "PID File", false, "", "pid");
 		cmd.add(nameArgPID);
@@ -234,6 +237,7 @@ int main(int argc, char** argv)
 		std::string name = nameArg0.getValue();
 		std::string port = nameArg1.getValue();
 		std::string pass = nameArg2.getValue();
+		std::string maxc = nameArg3.getValue();
 
 #ifdef SYSTEM_LINUX
 		std::string pidfile = nameArgPID.getValue();
@@ -246,7 +250,11 @@ int main(int argc, char** argv)
 		std::stringstream ssPort(port);
 		ssPort >> iPort;
 
-		if (server.Run(iPort, name.empty() ? nullptr : name.c_str(), pass.empty() ? nullptr : pass.c_str()))
+		int maxClients = 0;
+		std::stringstream ssMax(maxc);
+		ssMax >> maxClients;
+
+		if (server.Run(iPort, name.empty() ? nullptr : name.c_str(), pass.empty() ? nullptr : pass.c_str(), maxClients))
 		{
 			char c;
 			while (server.isRunning())

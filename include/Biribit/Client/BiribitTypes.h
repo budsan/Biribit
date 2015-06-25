@@ -20,6 +20,8 @@ struct API_EXPORT ServerInfo
 	std::uint32_t ping;
 	unsigned short port;
 	bool passwordProtected;
+	unsigned int max_clients;
+	unsigned int connected_clients;
 
 	ServerInfo();
 };

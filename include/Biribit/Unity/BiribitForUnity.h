@@ -105,11 +105,11 @@ API_C_EXPORT void brbt_Connect(brbt_Client client, const char* addr, unsigned sh
 API_C_EXPORT void brbt_Disconnect(brbt_Client client, brbt_id_t id_con);
 API_C_EXPORT void brbt_DisconnectAll(brbt_Client client);
 
-API_C_EXPORT void brbt_DiscoverOnLan(brbt_Client client, unsigned short port);
-API_C_EXPORT void brbt_ClearDiscoverInfo(brbt_Client client);
-API_C_EXPORT void brbt_RefreshDiscoverInfo(brbt_Client client);
+API_C_EXPORT void brbt_DiscoverServersOnLAN(brbt_Client client, unsigned short port);
+API_C_EXPORT void brbt_ClearServerList(brbt_Client client);
+API_C_EXPORT void brbt_RefreshServerList(brbt_Client client);
 
-API_C_EXPORT const brbt_ServerInfo_array brbt_GetDiscoverInfo(brbt_Client client, unsigned int* revision);
+API_C_EXPORT const brbt_ServerInfo_array brbt_GetServerList(brbt_Client client, unsigned int* revision);
 API_C_EXPORT const brbt_Connection_array brbt_GetConnections(brbt_Client client, unsigned int* revision);
 API_C_EXPORT const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_Client client, brbt_id_t id_conn, unsigned int* revision);
 

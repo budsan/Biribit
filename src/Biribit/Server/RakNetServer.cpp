@@ -618,6 +618,8 @@ void RakNetServer::PopulateProtoServerInfo(Proto::ServerInfo* proto_info)
 {
 	proto_info->set_name(m_name);
 	proto_info->set_password_protected(m_passwordProtected);
+	proto_info->set_max_clients(m_maxClients);
+	proto_info->set_connected_clients(m_clientAddrMap.size());
 }
 
 void RakNetServer::PopulateProtoClient(unique<Client>& client, Proto::Client* proto_client)
@@ -865,7 +867,7 @@ void RakNetServer::SendErrorCode(std::uint32_t error_code, RakNet::AddressOrGUID
 }
 
 
-bool RakNetServer::Run(unsigned short _port, const char* _name, const char* _password)
+bool RakNetServer::Run(unsigned short _port, const char* _name, const char* _password, unsigned int maxClients)
 {
 	if (m_peer != nullptr) {
 		return true;
@@ -889,13 +891,16 @@ bool RakNetServer::Run(unsigned short _port, const char* _name, const char* _pas
 	socketDescriptors[1].port = _port;
 	socketDescriptors[1].socketFamily = AF_INET6; // Test out IPV6
 
-	bool bOk = m_peer->Startup(SERVER_MAX_NUM_CLIENTS, socketDescriptors, 2) == RakNet::RAKNET_STARTED;
-	m_peer->SetMaximumIncomingConnections(SERVER_MAX_NUM_CLIENTS);
+	if (maxClients == 0)
+		maxClients = SERVER_DEFAULT_MAX_CONNECTIONS;
+
+	bool bOk = m_peer->Startup(maxClients, socketDescriptors, 2) == RakNet::RAKNET_STARTED;
+	m_peer->SetMaximumIncomingConnections(maxClients);
 	if (!bOk)
 	{
 		printLog("Failed to start dual IPV4 and IPV6 ports. Trying IPV4 only.");
 
-		bool bOk = m_peer->Startup(SERVER_MAX_NUM_CLIENTS, socketDescriptors, 1) == RakNet::RAKNET_STARTED;
+		bool bOk = m_peer->Startup(maxClients, socketDescriptors, 1) == RakNet::RAKNET_STARTED;
 		if (!bOk)
 		{
 			printLog("Server failed to start.  Terminating.");
@@ -907,6 +912,8 @@ bool RakNetServer::Run(unsigned short _port, const char* _name, const char* _pas
 			printLog("IPV4 only success.");
 		}
 	}
+
+	m_maxClients = maxClients;
 
 	m_peer->SetOccasionalPing(true);
 	m_peer->SetUnreliableTimeout(1000);

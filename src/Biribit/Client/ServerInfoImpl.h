@@ -9,6 +9,7 @@ struct ServerInfoImpl
 {
 	ServerInfo data;
 	Connection::id_t id;
+
 	bool valid;
 
 	ServerInfoImpl();
