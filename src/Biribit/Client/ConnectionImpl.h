@@ -51,6 +51,8 @@ public:
 	const Entry& GetEntry(Entry::id_t id);
 	void ResetEntries();
 
+	void UpdateRemoteClients(std::vector<RemoteClient>& vect);
+	void UpdateRooms(std::vector<Room>& vect);
 	void UpdateRemoteClients();
 	void UpdateRooms();
 };

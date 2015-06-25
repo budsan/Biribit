@@ -43,6 +43,21 @@ void Client::RefreshServerList()
 	m_impl->RefreshServerList();
 }
 
+std::future<std::vector<ServerInfo>> Client::GetFutureServerList()
+{
+	return m_impl->GetFutureServerList();
+}
+
+std::future<std::vector<Connection>> Client::GetFutureConnections()
+{
+	return m_impl->GetFutureConnections();
+}
+
+std::future<std::vector<RemoteClient>> Client::GetFutureRemoteClients(Connection::id_t id)
+{
+	return m_impl->GetFutureRemoteClients(id);
+}
+
 const std::vector<ServerInfo>& Client::GetServerList(std::uint32_t* revision)
 {
 	return m_impl->GetServerList(revision);

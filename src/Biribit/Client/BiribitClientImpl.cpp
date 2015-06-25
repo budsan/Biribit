@@ -172,7 +172,41 @@ void ClientImpl::ClearServerList()
 		}
 
 		if (modified)
-			UpdateDiscoverInfo();
+			UpdateServerList();
+	});
+}
+
+
+std::future<std::vector<ServerInfo>> ClientImpl::GetFutureServerList()
+{
+	return m_pool->enqueue([this]() -> std::vector<ServerInfo>
+	{
+		std::vector<ServerInfo> serverList;
+		UpdateServerList(serverList);
+		return serverList;
+	});
+}
+
+std::future<std::vector<Connection>> ClientImpl::GetFutureConnections()
+{
+	return m_pool->enqueue([this]() -> std::vector<Connection>
+	{
+		std::vector<Connection> connections;
+		UpdateConnections(connections);
+		return connections;
+	});
+}
+
+std::future<std::vector<RemoteClient>> ClientImpl::GetFutureRemoteClients(Connection::id_t id)
+{
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return std::future<std::vector<RemoteClient>>();
+
+	return m_pool->enqueue([this, id]() -> std::vector<RemoteClient>
+	{
+		std::vector<RemoteClient> remoteClients;
+		m_connections[id].UpdateRemoteClients(remoteClients);
+		return remoteClients;
 	});
 }
 
@@ -188,9 +222,9 @@ const std::vector<Connection>& ClientImpl::GetConnections(std::uint32_t* revisio
 
 const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(Connection::id_t id, std::uint32_t* revision)
 {
-	static std::vector<RemoteClient> empty;
+	static std::vector<RemoteClient> guard;
 	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
-		return empty;
+		return guard;
 
 	return m_connections[id].clientsListReq.front(revision);
 }
@@ -242,9 +276,9 @@ void ClientImpl::RefreshRooms(Connection::id_t id)
 
 const std::vector<Room>& ClientImpl::GetRooms(Connection::id_t id, std::uint32_t* revision)
 {
-	static std::vector<Room> empty;
+	static std::vector<Room> guard;
 	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
-		return empty;
+		return guard;
 
 	return m_connections[id].roomsListReq.front(revision);
 }
@@ -568,7 +602,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			{
 				ServerInfoImpl& si = serverList[pPacket->systemAddress];
 				PopulateServerInfo(si, &proto_info);
-				UpdateDiscoverInfo();
+				UpdateServerList();
 			}
 		}
 		break;
@@ -580,7 +614,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 
 		ServerInfoImpl& si = serverList[pPacket->systemAddress];
 		si.data.ping = current - pingTime;
-		UpdateDiscoverInfo();
+		UpdateServerList();
 
 		Packet tosend;
 		tosend << (RakNet::MessageID) ID_SERVER_INFO_REQUEST;
@@ -671,7 +705,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 				UpdateConnections();
 			}
 
-			UpdateDiscoverInfo();
+			UpdateServerList();
 		}
 
 		break;
@@ -993,38 +1027,43 @@ void ClientImpl::PopulateRoom(Room& room, const Proto::Room* proto_room)
 	}
 }
 
-void ClientImpl::UpdateDiscoverInfo()
+void ClientImpl::UpdateServerList(std::vector<ServerInfo>& vect)
 {
-	std::vector<ServerInfo>& back = serverListReq.back();
-	back.clear();
+	vect.clear();
 
 	for (auto it = serverList.begin(); it != serverList.end(); it++)
 	{
 		if (it->second.valid)
 		{
-			back.push_back(it->second.data);
-			back.back().addr = it->first.ToString(false);
-			back.back().port = it->first.GetPort();
+			vect.push_back(it->second.data);
+			vect.back().addr = it->first.ToString(false);
+			vect.back().port = it->first.GetPort();
 		}
 	}
-
-	serverListReq.swap();
 }
 
-void ClientImpl::UpdateConnections()
+void ClientImpl::UpdateConnections(std::vector<Connection>& vect)
 {
-	std::vector<Connection>& back = connectionsListReq.back();
-	back.clear();
-
+	vect.clear();
 	auto it = m_connections.begin(); it++;
 	for (; it != m_connections.end(); it++)
 	{
 		if (!it->isNull()) {
 			it->data.ping = m_peer->GetAveragePing(it->addr);
-			back.push_back(it->data);
+			vect.push_back(it->data);
 		}
 	}
+}
 
+void ClientImpl::UpdateServerList()
+{
+	UpdateServerList(serverListReq.back());
+	serverListReq.swap();
+}
+
+void ClientImpl::UpdateConnections()
+{
+	UpdateConnections(connectionsListReq.back());
 	connectionsListReq.swap();
 	RakNet::TimeMS m_lastDirtyDueTime = RakNet::GetTimeMS();
 }

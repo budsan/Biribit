@@ -4,10 +4,12 @@
 #include <cstdint>
 #include <vector>
 #include <memory>
+#include <future>
 
 #include <Biribit/BiribitConfig.h>
 #include <Biribit/Packet.h>
 #include <Biribit/Client/BiribitTypes.h>
+#include <Biribit/Client/BiribitEvent.h>
 
 namespace Biribit
 {
@@ -26,6 +28,10 @@ public:
 	void DiscoverServersOnLAN(unsigned short port = 0);
 	void ClearServerList();
 	void RefreshServerList();
+
+	std::future<std::vector<ServerInfo>> GetFutureServerList();
+	std::future<std::vector<Connection>> GetFutureConnections();
+	std::future<std::vector<RemoteClient>> GetFutureRemoteClients(Connection::id_t id);
 
 	const std::vector<ServerInfo>& GetServerList(std::uint32_t* revision = nullptr);
 	const std::vector<Connection>& GetConnections(std::uint32_t* revision = nullptr);

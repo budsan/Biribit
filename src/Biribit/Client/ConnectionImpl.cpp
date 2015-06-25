@@ -98,27 +98,33 @@ void ConnectionImpl::ResetEntries()
 	joinedRoomEntries.resize(1);
 }
 
-void ConnectionImpl::UpdateRemoteClients()
+void ConnectionImpl::UpdateRemoteClients(std::vector<RemoteClient>& vect)
 {
-	std::vector<RemoteClient>& back = clientsListReq.back();
-	back.clear();
+	vect.clear();
 
 	for (auto it = clients.begin(); it != clients.end(); it++)
 		if (it->id != RemoteClient::UNASSIGNED_ID)
-			back.push_back(*it);
+			vect.push_back(*it);
+}
 
+void ConnectionImpl::UpdateRooms(std::vector<Room>& vect)
+{
+	vect.clear();
+
+	for (auto it = rooms.begin(); it != rooms.end(); it++)
+		if (it->id != Room::UNASSIGNED_ID)
+			vect.push_back(*it);
+}
+
+void ConnectionImpl::UpdateRemoteClients()
+{
+	UpdateRemoteClients(clientsListReq.back());
 	clientsListReq.swap();
 }
 
 void ConnectionImpl::UpdateRooms()
 {
-	std::vector<Room>& back = roomsListReq.back();
-	back.clear();
-
-	for (auto it = rooms.begin(); it != rooms.end(); it++)
-		if (it->id != Room::UNASSIGNED_ID)
-			back.push_back(*it);
-
+	UpdateRooms(roomsListReq.back());
 	roomsListReq.swap();
 }
 

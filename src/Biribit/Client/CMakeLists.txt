@@ -20,6 +20,9 @@ set(SRC
 	${SRCROOT}/BiribitClientImpl.h
 	${SRCROOT}/BiribitClientExports.cpp
 	${INCROOT}/BiribitClientExports.h
+	${SRCROOT}/BiribitEvent.cpp
+	${INCROOT}/BiribitEvent.h
+	${INCROOT}/BiribitError.h
 )
 
 add_library(BiribitClient SHARED ${SRC})

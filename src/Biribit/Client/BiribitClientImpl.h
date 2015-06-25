@@ -10,6 +10,7 @@
 #include <Biribit/Common/Generic.h>
 
 #include <Biribit/Client/BiribitTypes.h>
+#include <Biribit/Client/BiribitEvent.h>
 
 #include "ServerInfoImpl.h"
 #include "ConnectionImpl.h"
@@ -46,6 +47,11 @@ public:
 	void DiscoverServersOnLAN(unsigned short port);
 	void ClearServerList();
 	void RefreshServerList();
+
+	std::future<std::vector<ServerInfo>> GetFutureServerList();
+	std::future<std::vector<Connection>> GetFutureConnections();
+	std::future<std::vector<RemoteClient>> GetFutureRemoteClients(Connection::id_t id);
+
 	const std::vector<ServerInfo>& GetServerList(std::uint32_t* revision);
 	const std::vector<Connection>& GetConnections(std::uint32_t* revision);
 	const std::vector<RemoteClient>& GetRemoteClients(Connection::id_t id, std::uint32_t* revision);
@@ -106,7 +112,9 @@ private:
 	static void PopulateRemoteClient(RemoteClient&, const Proto::Client*);
 	static void PopulateRoom(Room&, const Proto::Room*);
 
-	void UpdateDiscoverInfo();
+	void UpdateServerList(std::vector<ServerInfo>& vect);
+	void UpdateConnections(std::vector<Connection>& vect);
+	void UpdateServerList();
 	void UpdateConnections();
 
 	Generic::TempBuffer m_buffer;

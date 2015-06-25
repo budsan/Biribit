@@ -11,7 +11,7 @@
 namespace Biribit
 {
 
-typedef std::uint32_t TimeMS;
+typedef std::uint32_t Milliseconds;
 
 struct API_EXPORT ServerInfo
 {
@@ -72,7 +72,7 @@ struct API_EXPORT Room
 
 struct API_EXPORT Received
 {
-	TimeMS when;
+	Milliseconds when;
 	Connection::id_t connection;
 	Room::id_t room_id;
 	std::uint8_t slot_id;

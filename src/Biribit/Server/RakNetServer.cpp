@@ -5,6 +5,8 @@
 #include <Biribit/Common/Generic.h>
 #include <Biribit/Common/BiribitMessageIdentifiers.h>
 
+#include <Biribit/Client/BiribitError.h>
+
 #include <sstream>
 #include <chrono>
 
@@ -191,7 +193,7 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 
 		// another client is using that name
 		if (already_used)
-			SendErrorCode(WARN_CLIENT_NAME_IN_USE, addr);
+			SendErrorCode(Biribit::WARN_CLIENT_NAME_IN_USE, addr);
 	}
 
 	if (proto_update->has_appid() && client->appid != proto_update->appid())
@@ -217,7 +219,7 @@ void RakNetServer::ListRooms(RakNet::SystemAddress addr)
 {
 	unique<Client>& client = GetClient(addr);
 	if (client->appid.empty()) {
-		SendErrorCode(WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID, addr);
+		SendErrorCode(Biribit::WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID, addr);
 		printLog("WARN: Client (%d) \"%s\" can't list rooms without appid.", client->id, client->name.c_str());
 		return;
 	}
@@ -243,7 +245,7 @@ void RakNetServer::JoinRandomOrCreate(RakNet::SystemAddress addr, Proto::RoomCre
 {
 	unique<Client>& client = GetClient(addr);
 	if (client->appid.empty()) {
-		SendErrorCode(WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID, addr);
+		SendErrorCode(Biribit::WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID, addr);
 		printLog("WARN: Client (%d) \"%s\" can't list rooms without appid.", client->id, client->name.c_str());
 		return;
 	}
@@ -271,19 +273,19 @@ void RakNetServer::CreateRoom(RakNet::SystemAddress addr, Proto::RoomCreate* pro
 {
 	unique<Client>& client = GetClient(addr);
 	if (client->appid.empty()) {
-		SendErrorCode(WARN_CANNOT_CREATE_ROOM_WITHOUT_APPID, addr);
+		SendErrorCode(Biribit::WARN_CANNOT_CREATE_ROOM_WITHOUT_APPID, addr);
 		printLog("WARN: Client (%d) \"%s\" can't create a room without appid.", client->id, client->name.c_str());
 		return;
 	}
 
 	if (!proto_create->has_client_slots() || proto_create->client_slots() == 0) {
-		SendErrorCode(WARN_CANNOT_CREATE_ROOM_WITH_WRONG_SLOT_NUMBER, addr);
+		SendErrorCode(Biribit::WARN_CANNOT_CREATE_ROOM_WITH_WRONG_SLOT_NUMBER, addr);
 		printLog("WARN: Client (%d) \"%s\" tried to create a room with a wrong slot number.", client->id, client->name.c_str());
 		return;
 	}
 
 	if (proto_create->client_slots() > 0xFF) {
-		SendErrorCode(WARN_CANNOT_CREATE_ROOM_WITH_TOO_MANY_SLOTS, addr);
+		SendErrorCode(Biribit::WARN_CANNOT_CREATE_ROOM_WITH_TOO_MANY_SLOTS, addr);
 		printLog("WARN: Client (%d) \"%s\" tried to create a room with too many slots.", client->id, client->name.c_str());
 		return;
 	}
@@ -317,7 +319,7 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 {
 	unique<Client>& client = GetClient(addr);
 	if (!proto_join->has_id()) {
-		SendErrorCode(WARN_CANNOT_JOIN_WITHOUT_ROOM_ID, addr);
+		SendErrorCode(Biribit::WARN_CANNOT_JOIN_WITHOUT_ROOM_ID, addr);
 		printLog("WARN: Client (%d) \"%s\" sent RoomJoin without room id.", client->id, client->name.c_str());
 		return;
 	}
@@ -341,13 +343,13 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 		if (id != Room::UNASSIGNED_ID)
 		{
 			if (m_rooms[id] == nullptr) {
-				SendErrorCode(WARN_CANNOT_JOIN_TO_UNEXISTING_ROOM, addr);
+				SendErrorCode(Biribit::WARN_CANNOT_JOIN_TO_UNEXISTING_ROOM, addr);
 				printLog("WARN: Client (%d) \"%s\" tried to join to unexisting room.", client->id, client->name.c_str());
 				return;
 			}
 
 			if (m_rooms[id]->appid != client->appid) {
-				SendErrorCode(WARN_CANNOT_JOIN_TO_OTHER_APP_ROOM, addr);
+				SendErrorCode(Biribit::WARN_CANNOT_JOIN_TO_OTHER_APP_ROOM, addr);
 				printLog("WARN: Client (%d) \"%s\" tried to join other app's room.", client->id, client->name.c_str());
 				return;
 			}
@@ -363,9 +365,9 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 				slot = proto_join->slot_to_join();
 				if (slot >= room->slots.size() || room->slots[slot] != Client::UNASSIGNED_ID) {
 					if (slot >= room->slots.size())
-						SendErrorCode(WARN_CANNOT_JOIN_TO_INVALID_SLOT, addr);
+						SendErrorCode(Biribit::WARN_CANNOT_JOIN_TO_INVALID_SLOT, addr);
 					else
-						SendErrorCode(WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT, addr);
+						SendErrorCode(Biribit::WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT, addr);
 					printLog("WARN: Client (%d) \"%s\" tried to join an invalid slot.", client->id, client->name.c_str());
 					return;
 				}
@@ -374,7 +376,7 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 			{
 				for (slot = 0; slot < room->slots.size() && room->slots[slot] != Client::UNASSIGNED_ID; slot++);
 				if (slot >= m_rooms[id]->slots.size()) {
-					SendErrorCode(WARN_CANNOT_JOIN_TO_FULL_ROOM, addr);
+					SendErrorCode(Biribit::WARN_CANNOT_JOIN_TO_FULL_ROOM, addr);
 					printLog("WARN: Client (%d) \"%s\" tried to join a full room.", client->id, client->name.c_str());
 					return;
 				}
@@ -412,9 +414,9 @@ void RakNetServer::JoinRoom(RakNet::SystemAddress addr, Proto::RoomJoin* proto_j
 			std::uint32_t slot = proto_join->slot_to_join();
 			if (slot >= room->slots.size() || room->slots[slot] != Client::UNASSIGNED_ID) {
 				if (slot >= room->slots.size())
-					SendErrorCode(WARN_CANNOT_JOIN_TO_INVALID_SLOT, addr);
+					SendErrorCode(Biribit::WARN_CANNOT_JOIN_TO_INVALID_SLOT, addr);
 				else
-					SendErrorCode(WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT, addr);
+					SendErrorCode(Biribit::WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT, addr);
 				printLog("WARN: Client (%d) \"%s\" tried to join an invalid slot.", client->id, client->name.c_str());
 				return;
 			}
