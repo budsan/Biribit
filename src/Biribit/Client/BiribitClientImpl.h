@@ -129,6 +129,9 @@ private:
 
 	std::queue<std::unique_ptr<Received>> m_receivedPending;
 	std::mutex m_receivedMutex;
+
+	std::queue<std::unique_ptr<Event>> m_eventQueue;
+	std::mutex m_eventMutex;
 };
 
 } // namespace Biribit

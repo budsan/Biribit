@@ -8,28 +8,28 @@ namespace Biribit
 	enum EventType
 	{
 		TYPE_ERROR,
-		TYPE_SERVER_LIST_UPDATED,
-		TYPE_CONNECTIONS_UPDATED,
-		TYPE_REMOTE_CLIENTS_UPDATED,
-		TYPE_ROOM_LIST_UPDATED,
-		TYPE_JOINED_ROOM_UPDATED,
-		TYPE_BROADCAST_RECEIVED,
-		TYPE_ENTRIES_UPDATED,
+		TYPE_SERVER_LIST,
+		TYPE_CONNECTION,
+		TYPE_REMOTE_CLIENTS,
+		TYPE_ROOM_LIST,
+		TYPE_JOINED_ROOM,
+		TYPE_BROADCAST,
+		TYPE_ENTRIES,
 	};
 
 	struct API_EXPORT Event
 	{
 		EventType type;
 
+		Event(EventType);
 		virtual ~Event();
 	};
 
 	struct API_EXPORT ErrorEvent : public Event
 	{
-		// ID_ERROR_CODE
+		ErrorType which;
 
-		ErrorTypes which;
-
+		ErrorEvent();
 		virtual ~ErrorEvent();
 	};
 
@@ -37,13 +37,16 @@ namespace Biribit
 	{
 		// ID_SERVER_INFO_RESPONSE
 
+		ServerListEvent();
 		virtual ~ServerListEvent();
 	};
 
 	struct API_EXPORT ConnectionEvent : public Event
 	{
 		// ID_CLIENT_SELF_STATUS
+		// when DisconnectFrom is called
 
+		ConnectionEvent();
 		virtual ~ConnectionEvent();
 	};
 
@@ -55,6 +58,7 @@ namespace Biribit
 
 		Connection::id_t connection;
 
+		RemoteClientsEvent();
 		virtual ~RemoteClientsEvent();
 	};
 
@@ -64,6 +68,7 @@ namespace Biribit
 
 		Connection::id_t connection;
 
+		RoomListEvent();
 		virtual ~RoomListEvent();
 	};
 
@@ -74,15 +79,19 @@ namespace Biribit
 
 		Connection::id_t connection;
 
+		JoinedRoomEvent();
 		virtual ~JoinedRoomEvent();
 	};
 
 	struct API_EXPORT BroadcastEvent : public Event
 	{
-		// ID_BROADCAST_FROM_ROOM
-
 		Connection::id_t connection;
+		Milliseconds when;
+		Room::id_t room_id;
+		std::uint8_t slot_id;
+		Packet data;
 
+		BroadcastEvent();
 		virtual ~BroadcastEvent();
 	};
 
@@ -92,6 +101,7 @@ namespace Biribit
 
 		Connection::id_t connection;
 
+		EntriesEvent();
 		virtual ~EntriesEvent();
 	};
 }

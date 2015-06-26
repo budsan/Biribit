@@ -687,6 +687,13 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			printLog("Error code WARN_CANNOT_JOIN_TO_FULL_ROOM"); break;
 		}
 		break;
+
+		std::unique_ptr<ErrorEvent> ev = std::unique_ptr<ErrorEvent>(new ErrorEvent());
+		ev->which = (ErrorType)errorCode;
+		{
+			std::lock_guard<std::mutex> lock(m_eventMutex);
+			m_eventQueue.push(std::move(ev));
+		}
 	}
 	case ID_SERVER_INFO_REQUEST:
 		BIRIBIT_WARN("Nothing to do with ID_SERVER_INFO_REQUEST");
@@ -836,7 +843,8 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		if (si.id != Connection::UNASSIGNED_ID)
 		{
 			ConnectionImpl& sc = m_connections[si.id];
-			std::unique_ptr<Received> recv(new Received);
+			std::unique_ptr<BroadcastEvent> recv(new BroadcastEvent());
+
 			recv->connection = si.id;
 			recv->room_id = sc.joinedRoom;
 			stream.Read(recv->slot_id);
@@ -849,8 +857,10 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			stream.Read(m_buffer.data, size);
 			recv->data.append(m_buffer.data, size);
 
-			std::lock_guard<std::mutex> lock(m_receivedMutex);
-			m_receivedPending.push(std::move(recv));
+			{
+				std::lock_guard<std::mutex> lock(m_eventMutex);
+				m_eventQueue.push(std::move(recv));
+			}
 		}
 		break;
 	}
@@ -911,41 +921,42 @@ void ClientImpl::ConnectedAt(RakNet::SystemAddress addr)
 
 	SendProtocolMessageID(ID_SERVER_INFO_REQUEST, addr);
 	SendProtocolMessageID(ID_SERVER_STATUS_REQUEST, addr);
+
 	UpdateConnections();
 }
 
 void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 {
 	ServerInfoImpl& si = serverList[addr];
-	if (si.id != Connection::UNASSIGNED_ID)
-	{
-		ConnectionImpl& sc = m_connections[si.id];
-		if (si.valid)
-			printLog("Disconnected from %s.", sc.data.name.c_str());
+	BIRIBIT_ASSERT(si.id != Connection::UNASSIGNED_ID);
 
-		sc.addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
-		sc.selfId = RemoteClient::UNASSIGNED_ID;
-		si.id = Connection::UNASSIGNED_ID;
-		UpdateConnections();
+	ConnectionImpl& sc = m_connections[si.id];
+	if (si.valid)
+		printLog("Disconnected from %s.", sc.data.name.c_str());
 
-		sc.requested = ClientParameters();
+	sc.addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
+	sc.selfId = RemoteClient::UNASSIGNED_ID;
+	si.id = Connection::UNASSIGNED_ID;
+	UpdateConnections();
 
-		sc.joinedRoom = Room::UNASSIGNED_ID;
-		sc.joinedSlot = 0;
-		sc.ResetEntries();
+	sc.requested = ClientParameters();
 
-		sc.clients.clear();
-		sc.UpdateRemoteClients();
+	sc.joinedRoom = Room::UNASSIGNED_ID;
+	sc.joinedSlot = 0;
+	sc.ResetEntries();
 
-		sc.rooms.clear();
-		sc.UpdateRooms();
-	}
+	sc.clients.clear();
+	sc.UpdateRemoteClients();
+
+	sc.rooms.clear();
+	sc.UpdateRooms();
 }
 
 void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type)
 {
 	ServerInfoImpl& si = serverList[addr];
 	BIRIBIT_ASSERT(si.id != Connection::UNASSIGNED_ID);
+
 	ConnectionImpl& sc = m_connections[si.id];
 	if (proto_client->has_id())
 	{
