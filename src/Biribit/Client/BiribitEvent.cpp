@@ -3,6 +3,7 @@
 namespace Biribit
 {
 
+Event::Event() : type(TYPE_NONE) {}
 Event::Event(EventType _type) : type(_type) {}
 Event::~Event() {}
 

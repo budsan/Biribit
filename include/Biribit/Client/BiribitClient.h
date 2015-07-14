@@ -63,6 +63,8 @@ public:
 	std::size_t GetDataSizeOfNextReceived();
 	std::unique_ptr<Received> PullReceived();
 
+	std::unique_ptr<Event> PullEvent();
+
 	Entry::id_t GetEntriesCount(Connection::id_t id);
 	const Entry& GetEntry(Connection::id_t id, Entry::id_t entryId);
 

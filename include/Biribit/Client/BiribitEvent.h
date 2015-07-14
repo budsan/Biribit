@@ -7,6 +7,7 @@ namespace Biribit
 {
 	enum EventType
 	{
+		TYPE_NONE = 0,
 		TYPE_ERROR,
 		TYPE_SERVER_LIST,
 		TYPE_CONNECTION,
@@ -21,6 +22,7 @@ namespace Biribit
 	{
 		EventType type;
 
+		Event();
 		Event(EventType);
 		virtual ~Event();
 	};

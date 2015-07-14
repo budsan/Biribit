@@ -1,4 +1,5 @@
 #include "ConnectionImpl.h"
+#include "BiribitClientImpl.h"
 
 namespace Biribit
 {
@@ -12,6 +13,23 @@ ConnectionImpl::ConnectionImpl()
 	, joinedSlot(0)
 	, joinedRoomEntries(1)
 {
+}
+
+void ConnectionImpl::Clear()
+{
+	addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
+	selfId = RemoteClient::UNASSIGNED_ID;
+	requested = ClientParameters();
+
+	joinedRoom = Room::UNASSIGNED_ID;
+	joinedSlot = 0;
+	ResetEntries();
+
+	clients.clear();
+	UpdateRemoteClients(false);
+
+	rooms.clear();
+	UpdateRooms(false);
 }
 
 bool ConnectionImpl::isNull()
@@ -116,14 +134,28 @@ void ConnectionImpl::UpdateRooms(std::vector<Room>& vect)
 			vect.push_back(*it);
 }
 
-void ConnectionImpl::UpdateRemoteClients()
+void ConnectionImpl::UpdateRemoteClients(bool pushEvent)
 {
+	if (pushEvent)
+	{
+		auto ev = std::unique_ptr<RemoteClientsEvent>(new RemoteClientsEvent());
+		ev->connection = data.id;
+		parent->PushEvent(std::move(ev));
+	}
+
 	UpdateRemoteClients(clientsListReq.back());
 	clientsListReq.swap();
 }
 
-void ConnectionImpl::UpdateRooms()
+void ConnectionImpl::UpdateRooms(bool pushEvent)
 {
+	if (pushEvent)
+	{
+		auto ev = std::unique_ptr<RoomListEvent>(new RoomListEvent());
+		ev->connection = data.id;
+		parent->PushEvent(std::move(ev));
+	}
+	
 	UpdateRooms(roomsListReq.back());
 	roomsListReq.swap();
 }

@@ -30,6 +30,9 @@ const char* ConnectionAttemptResultStr[] = {
 ClientImpl::ClientImpl()
 	: m_peer(nullptr)
 {
+	for (ConnectionImpl& c : m_connections)
+		c.parent = this;
+
 	m_pool = unique<TaskPool>(new TaskPool(1, "Client"));
 
 	m_peer = RakNet::RakPeerInterface::GetInstance();
@@ -515,6 +518,17 @@ std::unique_ptr<Received> ClientImpl::PullReceived()
 	return std::move(ptr);
 }
 
+std::unique_ptr<Event> ClientImpl::PullEvent()
+{
+	std::lock_guard<std::mutex> lock(m_eventMutex);
+	if (m_eventQueue.empty())
+		return nullptr;
+
+	std::unique_ptr<Event> ptr = std::move(m_eventQueue.front());
+	m_eventQueue.pop();
+	return std::move(ptr);
+}
+
 Entry::id_t ClientImpl::GetEntriesCount(Connection::id_t id)
 {
 	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
@@ -934,22 +948,9 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 	if (si.valid)
 		printLog("Disconnected from %s.", sc.data.name.c_str());
 
-	sc.addr = RakNet::UNASSIGNED_SYSTEM_ADDRESS;
-	sc.selfId = RemoteClient::UNASSIGNED_ID;
+	sc.Clear();
 	si.id = Connection::UNASSIGNED_ID;
 	UpdateConnections();
-
-	sc.requested = ClientParameters();
-
-	sc.joinedRoom = Room::UNASSIGNED_ID;
-	sc.joinedSlot = 0;
-	sc.ResetEntries();
-
-	sc.clients.clear();
-	sc.UpdateRemoteClients();
-
-	sc.rooms.clear();
-	sc.UpdateRooms();
 }
 
 void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type)
@@ -1038,6 +1039,12 @@ void ClientImpl::PopulateRoom(Room& room, const Proto::Room* proto_room)
 	}
 }
 
+void ClientImpl::PushEvent(std::unique_ptr<Event> to_push)
+{
+	std::lock_guard<std::mutex> lock(m_eventMutex);
+	m_eventQueue.push(std::move(to_push));
+}
+
 void ClientImpl::UpdateServerList(std::vector<ServerInfo>& vect)
 {
 	vect.clear();
@@ -1068,12 +1075,16 @@ void ClientImpl::UpdateConnections(std::vector<Connection>& vect)
 
 void ClientImpl::UpdateServerList()
 {
+	PushEvent(std::unique_ptr<ServerListEvent>(new ServerListEvent()));
+
 	UpdateServerList(serverListReq.back());
 	serverListReq.swap();
 }
 
 void ClientImpl::UpdateConnections()
 {
+	PushEvent(std::unique_ptr<ConnectionEvent>(new ConnectionEvent()));
+
 	UpdateConnections(connectionsListReq.back());
 	connectionsListReq.swap();
 	RakNet::TimeMS m_lastDirtyDueTime = RakNet::GetTimeMS();

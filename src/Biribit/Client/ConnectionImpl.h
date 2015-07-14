@@ -20,9 +20,12 @@
 namespace Biribit
 {
 
+class ClientImpl;
 class ConnectionImpl
 {
 public:
+	ClientImpl* parent;
+
 	Connection data;
 	RakNet::SystemAddress addr;
 
@@ -45,6 +48,7 @@ public:
 
 	ConnectionImpl();
 
+	void Clear();
 	bool isNull();
 	unique<Proto::RoomEntriesRequest> UpdateEntries(Proto::RoomEntriesStatus* proto_entries);
 	Entry::id_t GetEntriesCount();
@@ -53,8 +57,8 @@ public:
 
 	void UpdateRemoteClients(std::vector<RemoteClient>& vect);
 	void UpdateRooms(std::vector<Room>& vect);
-	void UpdateRemoteClients();
-	void UpdateRooms();
+	void UpdateRemoteClients(bool pushEvent = true);
+	void UpdateRooms(bool pushEvent = true);
 };
 
 } // namespace Biribit

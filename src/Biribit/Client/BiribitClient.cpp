@@ -158,6 +158,11 @@ std::unique_ptr<Received> Client::PullReceived()
 	return m_impl->PullReceived();
 }
 
+std::unique_ptr<Event> Client::PullEvent()
+{
+	return m_impl->PullEvent();
+}
+
 Entry::id_t Client::GetEntriesCount(Connection::id_t id)
 {
 	return m_impl->GetEntriesCount(id);
