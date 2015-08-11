@@ -88,7 +88,7 @@ namespace Biribit
 	struct API_EXPORT BroadcastEvent : public Event
 	{
 		Connection::id_t connection;
-		Milliseconds when;
+		milliseconds_t when;
 		Room::id_t room_id;
 		std::uint8_t slot_id;
 		Packet data;

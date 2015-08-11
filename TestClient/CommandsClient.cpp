@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <iostream>
+#include <list>
 
 #include <Biribit/Client.h>
 
@@ -34,6 +35,24 @@ class ClientUpdater : public UpdaterListener
 	int rooms_listbox_current;
 	int slots;
 	int slots_to_join;
+
+	std::vector<Biribit::ServerInfo> serverInfo;
+	std::vector<Biribit::Connection> connections;
+
+	struct ConnectionInfo
+	{
+		std::vector<Biribit::RemoteClient> remoteClients;
+		std::vector<Biribit::Room> rooms;
+
+		Biribit::Room::id_t joined_room;
+		Biribit::Room::slot_id_t joined_room_slot;
+
+		std::list<std::string> chats;
+		std::list<std::string> entries;
+	};
+
+	std::vector<ConnectionInfo> connectionsInfo;
+
 	Biribit::Connection::id_t connectionId;
 
 	std::vector<const char*> server_listbox;
@@ -45,8 +64,7 @@ class ClientUpdater : public UpdaterListener
 	std::vector<const char*> rooms_listbox;
 	std::vector<std::string> rooms_listbox_str;
 
-	std::map<Biribit::Connection::id_t, std::list<std::string>> chats;
-	std::map<Biribit::Connection::id_t, std::pair<Biribit::Room::id_t, std::list<std::string>>> entries;
+	std::list<std::function<bool()>> tasks;
 public:
 
 	ClientUpdater()
@@ -68,74 +86,161 @@ public:
 
 private:
 
+	template<class T, class U> std::unique_ptr<T> unique_ptr_cast(std::unique_ptr<U>& ptr)
+	{
+		return std::unique_ptr<T>(static_cast<T*>(ptr.release()));
+	}
+
+	template<class T> void PushFuture(T* dst, std::shared_future<T> src)
+	{
+		tasks.push_back([this, dst, src]() -> bool { return HandleFuture<T>(dst, src); });
+	}
+
+	template<class T> bool HandleFuture(T* dst, std::shared_future<T> src)
+	{
+		if (!src.valid())
+			return true;
+
+		if (src.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+			(*dst) = src.get();
+			return true;
+		}
+
+		return false;
+	}
+
+	void UpdateEntries(Biribit::Connection::id_t id)
+	{
+		if (id >= connectionsInfo.size())
+			connectionsInfo.resize(id + 1);
+
+		ConnectionInfo& info = connectionsInfo[id];
+		if (info.joined_room > Biribit::Room::UNASSIGNED_ID)
+		{
+			std::list<std::string>& connectionEntries = info.entries;
+			std::uint32_t count = client->GetEntriesCount(connectionId);
+			for (std::uint32_t i = connectionEntries.size() + 1; i <= count; i++)
+			{
+				const Biribit::Entry& entry = client->GetEntry(connectionId, i);
+				bool isPrintable = true;
+				const char* it = (const char*)entry.data.getData();
+				const char* itEnd = it + entry.data.getDataSize();
+
+				std::stringstream hex;
+				for (; it != itEnd; it++)
+				{
+					static char hexTable[] = "0123456789ABCDEF";
+					static char bytehex[3] = { '\0', '\0', '\0' };
+
+					bool ok = ((it + 1) == itEnd && (*it) == '\0') || isprint(*it);
+					isPrintable = ok && isPrintable;
+
+					bytehex[0] = hexTable[(*it & 0xF0) >> 4];
+					bytehex[1] = hexTable[(*it & 0x0F) >> 0];
+					hex << bytehex;
+				}
+
+				if (entry.id > Biribit::Entry::UNASSIGNED_ID)
+				{
+					std::stringstream ss;
+					ss << "[Player " << (std::uint32_t) entry.from_slot << "]: ";
+					if (isPrintable)
+						ss << (const char*)entry.data.getData();
+					else
+						ss << "binary: " << hex.str();
+
+					connectionEntries.push_back(ss.str());
+				}
+				else
+				{
+					break;
+				}
+			}
+		}
+	}
+
 	void OnUpdate(float deltaTime) override
 	{
 		if (client == nullptr)
 			return;
 
-		std::unique_ptr<Biribit::Received> recv;
-		while ((recv = client->PullReceived()) != nullptr)
+		std::unique_ptr<Biribit::Event> evnt;
+		while ((evnt = client->PullEvent()) != nullptr)
 		{
-			std::stringstream ss;
-			auto secs = recv->when / 1000;
-			auto mins = secs / 60;
-			ss <<  mins % 60 << ":" << secs % 60;
-			ss << " [Room " << recv->room_id << ", Player " << (std::uint32_t) recv->slot_id << "]: " << (const char*)recv->data.getData();
-			chats[recv->connection].push_back(ss.str());
-		}
-
-		if (connectionId != Biribit::Connection::UNASSIGNED_ID)
-		{
-			std::pair<Biribit::Room::id_t, std::list<std::string>>& pair = entries[connectionId];
-			Biribit::Room::id_t joinedRoom = client->GetJoinedRoomId(connectionId);
-			if (pair.first != joinedRoom) {
-				pair.first = joinedRoom;
-				pair.second.clear();
-			}
-
-			if (pair.first > Biribit::Room::UNASSIGNED_ID)
+			switch (evnt->type)
 			{
-				std::list<std::string>& connectionEntries = pair.second;
-				std::uint32_t count = client->GetEntriesCount(connectionId);
-				for (std::uint32_t i = connectionEntries.size() + 1; i <= count; i++)
-				{
-					const Biribit::Entry& entry = client->GetEntry(connectionId, i);
-					bool isPrintable = true;
-					const char* it = (const char*)entry.data.getData();
-					const char* itEnd = it + entry.data.getDataSize();
+			case Biribit::TYPE_NONE:
+				break;
+			case Biribit::TYPE_ERROR:
+				break;
+			case Biribit::TYPE_SERVER_LIST:
+				PushFuture(&serverInfo, client->GetFutureServerList().share());
+				break;
+			case Biribit::TYPE_CONNECTION:
+				PushFuture(&connections, client->GetFutureConnections().share());
+				break;
+			case Biribit::TYPE_REMOTE_CLIENTS:
+			{
+				auto rc_evnt = unique_ptr_cast<Biribit::RemoteClientsEvent>(evnt);
+				auto id = rc_evnt->connection;
+				if (id >= connectionsInfo.size())
+					connectionsInfo.resize(id + 1);
 
-					std::stringstream hex;
-					for (; it != itEnd; it++)
-					{
-						static char hexTable[] = "0123456789ABCDEF";
-						static char bytehex[3] = { '\0', '\0', '\0' };
+				PushFuture(&connectionsInfo[id].remoteClients, client->GetFutureRemoteClients(id).share());
+				break;
+			}
+			case Biribit::TYPE_ROOM_LIST:
+			{
+				auto rl_evnt = unique_ptr_cast<Biribit::RoomListEvent>(evnt);
+				auto id = rl_evnt->connection;
+				if (id >= connectionsInfo.size())
+					connectionsInfo.resize(id + 1);
 
-						bool ok = ((it + 1) == itEnd && (*it) == '\0') || isprint(*it);
-						isPrintable = ok && isPrintable;
+				PushFuture(&connectionsInfo[id].rooms, client->GetFutureRooms(id).share());
+				break;
+			}
+				break;
+			case Biribit::TYPE_JOINED_ROOM:
+			{
+				auto jr_evnt = unique_ptr_cast<Biribit::JoinedRoomEvent>(evnt);
+				auto id = jr_evnt->connection;
+				if (id >= connectionsInfo.size())
+					connectionsInfo.resize(id + 1);
 
-						bytehex[0] = hexTable[(*it & 0xF0) >> 4];
-						bytehex[1] = hexTable[(*it & 0x0F) >> 0];
-						hex << bytehex;
-					}
+				ConnectionInfo& info = connectionsInfo[id];
+				info.joined_room = client->GetJoinedRoomId(id);
+				info.joined_room_slot = client->GetJoinedRoomSlot(id);
+				info.entries.clear();
 
-					if (entry.id > Biribit::Entry::UNASSIGNED_ID)
-					{
-						std::stringstream ss;
-						ss << "[Player " << (std::uint32_t) entry.from_slot << "]: ";
-						if (isPrintable)
-							ss << (const char*)entry.data.getData();
-						else
-							ss << "binary: " << hex.str();
+				break;
+			}
+			case Biribit::TYPE_BROADCAST:
+			{
+				std::unique_ptr<Biribit::BroadcastEvent> recv = unique_ptr_cast<Biribit::BroadcastEvent>(evnt);
+				auto id = recv->connection;
+				if (id >= connectionsInfo.size())
+					connectionsInfo.resize(id + 1);
 
-						connectionEntries.push_back(ss.str());
-					}
-					else
-					{
-						break;
-					}
-				}
+				std::stringstream ss;
+				auto secs = recv->when / 1000;
+				auto mins = secs / 60;
+				ss << mins % 60 << ":" << secs % 60;
+				ss << " [Room " << recv->room_id << ", Player " << (std::uint32_t) recv->slot_id << "]: " << (const char*)recv->data.getData();
+				connectionsInfo[id].chats.push_back(ss.str());
+				break;
+			}
+			case Biribit::TYPE_ENTRIES:
+			{
+				std::unique_ptr<Biribit::EntriesEvent> entry = unique_ptr_cast<Biribit::EntriesEvent>(evnt);
+				UpdateEntries(entry->connection);
+				break;
+			}
 			}
 		}
+
+		for (auto it = tasks.begin(); it != tasks.end(); it++)
+			if ((*it)())
+				it = tasks.erase(it);
 	}
 
 	void OnGUI() override
@@ -171,7 +276,7 @@ private:
 			if (ImGui::Button("Refresh servers"))
 				client->RefreshServerList();
 
-			const std::vector<Biribit::ServerInfo>& discover_info = client->GetServerList();
+			const std::vector<Biribit::ServerInfo>& discover_info = this->serverInfo;
 			server_listbox.clear();
 			server_listbox_str.clear();
 			for (auto it = discover_info.begin(); it != discover_info.end(); it++) {
@@ -202,7 +307,7 @@ private:
 			}
 		}
 
-		const std::vector<Biribit::Connection>& conns = client->GetConnections();
+		const std::vector<Biribit::Connection>& conns = this->connections;
 		connections_listbox.clear();
 		connections_listbox_str.clear();
 		for (auto it = conns.begin(); it != conns.end(); it++)
@@ -234,7 +339,9 @@ private:
 					client->Disconnect();
 			}
 			
-			const std::vector<Biribit::RemoteClient>& clients = client->GetRemoteClients(connectionId);
+
+			ConnectionInfo& info = connectionsInfo[connectionId];
+			const std::vector<Biribit::RemoteClient>& clients = info.remoteClients;
 			std::map<Biribit::RemoteClient::id_t, std::vector<Biribit::RemoteClient>::const_iterator> idToClient;
 			Biribit::RemoteClient::id_t selfId = client->GetLocalClientId(connectionId);
 			for (auto it = clients.begin(); it != clients.end(); it++)
@@ -259,7 +366,7 @@ private:
 			}
 			
 
-			const std::vector<Biribit::Room>& rooms = client->GetRooms(connectionId);
+			const std::vector<Biribit::Room>& rooms = info.rooms;
 			Biribit::Room::id_t joined = client->GetJoinedRoomId(connectionId);
 			std::uint32_t slot = client->GetJoinedRoomSlot(connectionId);
 
@@ -355,27 +462,24 @@ private:
 				}
 
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1));
-				for (auto it = chats[connectionId].rbegin(); it != chats[connectionId].rend(); it++)
+				for (auto it = info.chats.rbegin(); it != info.chats.rend(); it++)
 					ImGui::TextUnformatted(it->c_str());
 				ImGui::PopStyleVar();
 			}
-		}
 
-		if (ImGui::CollapsingHeader("Entries"))
-		{
-			for (auto it = entries.begin(); it != entries.end(); it++)
+			if (ImGui::CollapsingHeader("Entries"))
 			{
-				auto pair = it->second;
-				ImGui::LabelText("##entriesconn", "Connection %d. Room %d.", it->first, pair.first);
+				ImGui::LabelText("##entriesconn", "Connection %d. Room %d.", connectionId, info.joined_room);
 				ImGui::Separator();
 
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1));
-				for (auto strIt = pair.second.begin(); strIt != pair.second.end(); strIt++)
-					ImGui::TextUnformatted(strIt->c_str());
+				for (auto it = info.entries.begin(); it != info.entries.end(); it++)
+						ImGui::TextUnformatted(it->c_str());
 				ImGui::PopStyleVar();
 			}
 		}
 
+	
 		ImGui::End();
 	}
 

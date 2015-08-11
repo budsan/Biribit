@@ -39,7 +39,7 @@ public:
 	RefSwap<std::vector<Room>> roomsListReq;
 
 	Room::id_t joinedRoom;
-	std::uint32_t joinedSlot;
+	Room::slot_id_t joinedSlot;
 
 	std::vector<RefSwap<Entry>> joinedRoomEntries;
 	std::mutex entriesMutex;

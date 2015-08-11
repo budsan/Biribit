@@ -58,6 +58,12 @@ std::future<std::vector<RemoteClient>> Client::GetFutureRemoteClients(Connection
 	return m_impl->GetFutureRemoteClients(id);
 }
 
+future_vector<Room> Client::GetFutureRooms(Connection::id_t id)
+{
+	return m_impl->GetFutureRooms(id);
+}
+
+/*
 const std::vector<ServerInfo>& Client::GetServerList(std::uint32_t* revision)
 {
 	return m_impl->GetServerList(revision);
@@ -72,6 +78,13 @@ const std::vector<RemoteClient>& Client::GetRemoteClients(Connection::id_t id, s
 {
 	return m_impl->GetRemoteClients(id, revision);
 }
+
+const std::vector<Room>& Client::GetRooms(Connection::id_t id, std::uint32_t* revision)
+{
+return m_impl->GetRooms(id, revision);
+}
+
+*/
 
 RemoteClient::id_t Client::GetLocalClientId(Connection::id_t id)
 {
@@ -88,22 +101,17 @@ void Client::RefreshRooms(Connection::id_t id)
 	m_impl->RefreshRooms(id);
 }
 
-const std::vector<Room>& Client::GetRooms(Connection::id_t id, std::uint32_t* revision)
-{
-	return m_impl->GetRooms(id, revision);
-}
-
-void Client::CreateRoom(Connection::id_t id, std::uint32_t num_slots)
+void Client::CreateRoom(Connection::id_t id, Room::slot_id_t num_slots)
 {
 	m_impl->CreateRoom(id, num_slots);
 }
 
-void Client::CreateRoom(Connection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id)
+void Client::CreateRoom(Connection::id_t id, Room::slot_id_t num_slots, Room::slot_id_t slot_to_join_id)
 {
 	m_impl->CreateRoom(id, num_slots, slot_to_join_id);
 }
 
-void Client::JoinRandomOrCreateRoom(Connection::id_t id, std::uint32_t num_slots)
+void Client::JoinRandomOrCreateRoom(Connection::id_t id, Room::slot_id_t num_slots)
 {
 	m_impl->JoinRandomOrCreateRoom(id, num_slots);
 }
@@ -113,7 +121,7 @@ void Client::JoinRoom(Connection::id_t id, Room::id_t room_id)
 	m_impl->JoinRoom(id, room_id);
 }
 
-void Client::JoinRoom(Connection::id_t id, Room::id_t room_id, std::uint32_t slot_id)
+void Client::JoinRoom(Connection::id_t id, Room::id_t room_id, Room::slot_id_t slot_id)
 {
 	m_impl->JoinRoom(id, room_id, slot_id);
 }
@@ -123,7 +131,7 @@ Room::id_t Client::GetJoinedRoomId(Connection::id_t id)
 	return m_impl->GetJoinedRoomId(id);
 }
 
-std::uint32_t Client::GetJoinedRoomSlot(Connection::id_t id)
+Room::slot_id_t Client::GetJoinedRoomSlot(Connection::id_t id)
 {
 	return m_impl->GetJoinedRoomSlot(id);
 }
@@ -146,16 +154,6 @@ void Client::SendEntry(Connection::id_t id, const Packet& packet)
 void Client::SendEntry(Connection::id_t id, const char* data, unsigned int lenght)
 {
 	m_impl->SendEntry(id, data, lenght);
-}
-
-std::size_t Client::GetDataSizeOfNextReceived()
-{
-	return m_impl->GetDataSizeOfNextReceived();
-}
-
-std::unique_ptr<Received> Client::PullReceived()
-{
-	return m_impl->PullReceived();
 }
 
 std::unique_ptr<Event> Client::PullEvent()

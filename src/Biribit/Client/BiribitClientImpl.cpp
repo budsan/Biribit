@@ -202,14 +202,25 @@ std::future<std::vector<Connection>> ClientImpl::GetFutureConnections()
 
 std::future<std::vector<RemoteClient>> ClientImpl::GetFutureRemoteClients(Connection::id_t id)
 {
-	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
-		return std::future<std::vector<RemoteClient>>();
-
 	return m_pool->enqueue([this, id]() -> std::vector<RemoteClient>
 	{
 		std::vector<RemoteClient> remoteClients;
-		m_connections[id].UpdateRemoteClients(remoteClients);
+		if (id != Connection::UNASSIGNED_ID && id <= CLIENT_MAX_CONNECTIONS)
+			m_connections[id].UpdateRemoteClients(remoteClients);
+
 		return remoteClients;
+	});
+}
+
+future_vector<Room> ClientImpl::GetFutureRooms(Connection::id_t id)
+{
+	return m_pool->enqueue([this, id]() -> std::vector<Room>
+	{
+		std::vector<Room> rooms;
+		if (id != Connection::UNASSIGNED_ID && id <= CLIENT_MAX_CONNECTIONS)
+			m_connections[id].UpdateRooms(rooms);
+
+		return rooms;
 	});
 }
 
@@ -230,6 +241,15 @@ const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(Connection::id_t i
 		return guard;
 
 	return m_connections[id].clientsListReq.front(revision);
+}
+
+const std::vector<Room>& ClientImpl::GetRooms(Connection::id_t id, std::uint32_t* revision)
+{
+	static std::vector<Room> guard;
+	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
+		return guard;
+
+	return m_connections[id].roomsListReq.front(revision);
 }
 
 RemoteClient::id_t ClientImpl::GetLocalClientId(Connection::id_t id)
@@ -277,16 +297,7 @@ void ClientImpl::RefreshRooms(Connection::id_t id)
 	});
 }
 
-const std::vector<Room>& ClientImpl::GetRooms(Connection::id_t id, std::uint32_t* revision)
-{
-	static std::vector<Room> guard;
-	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
-		return guard;
-
-	return m_connections[id].roomsListReq.front(revision);
-}
-
-void ClientImpl::CreateRoom(Connection::id_t id, std::uint32_t num_slots)
+void ClientImpl::CreateRoom(Connection::id_t id, Room::slot_id_t num_slots)
 {
 	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
@@ -305,7 +316,7 @@ void ClientImpl::CreateRoom(Connection::id_t id, std::uint32_t num_slots)
 	});
 }
 
-void ClientImpl::CreateRoom(Connection::id_t id, std::uint32_t num_slots, std::uint32_t slot_to_join_id)
+void ClientImpl::CreateRoom(Connection::id_t id, Room::slot_id_t num_slots, Room::slot_id_t slot_to_join_id)
 {
 	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
@@ -325,7 +336,7 @@ void ClientImpl::CreateRoom(Connection::id_t id, std::uint32_t num_slots, std::u
 	});
 }
 
-void ClientImpl::JoinRandomOrCreateRoom(Connection::id_t id, std::uint32_t num_slots)
+void ClientImpl::JoinRandomOrCreateRoom(Connection::id_t id, Room::slot_id_t num_slots)
 {
 	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
@@ -363,7 +374,7 @@ void ClientImpl::JoinRoom(Connection::id_t id, Room::id_t room_id)
 	});
 }
 
-void ClientImpl::JoinRoom(Connection::id_t id, Room::id_t room_id, std::uint32_t slot_id)
+void ClientImpl::JoinRoom(Connection::id_t id, Room::id_t room_id, Room::slot_id_t slot_id)
 {
 	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return;
@@ -391,7 +402,7 @@ Room::id_t ClientImpl::GetJoinedRoomId(Connection::id_t id)
 	return m_connections[id].joinedRoom;
 }
 
-std::uint32_t ClientImpl::GetJoinedRoomSlot(Connection::id_t id)
+Room::slot_id_t ClientImpl::GetJoinedRoomSlot(Connection::id_t id)
 {
 	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
 		return RemoteClient::UNASSIGNED_ID;
@@ -496,26 +507,6 @@ void ClientImpl::SendEntry(Connection::id_t id, shared<Packet> packet)
 		int lengths[2] = { (int)bstream.GetNumberOfBytesUsed(), (int)shared_packet->getDataSize() };
 		m_peer->SendList(data, lengths, 2, MEDIUM_PRIORITY, RELIABLE, id & 0xFF, conn.addr, false);
 	});
-}
-
-std::size_t ClientImpl::GetDataSizeOfNextReceived()
-{
-	std::lock_guard<std::mutex> lock(m_receivedMutex);
-	if (m_receivedPending.empty())
-		return 0;
-
-	return m_receivedPending.front()->data.getDataSize();
-}
-
-std::unique_ptr<Received> ClientImpl::PullReceived()
-{
-	std::lock_guard<std::mutex> lock(m_receivedMutex);
-	if (m_receivedPending.empty())
-		return nullptr;
-
-	std::unique_ptr<Received> ptr = std::move(m_receivedPending.front());
-	m_receivedPending.pop();
-	return std::move(ptr);
 }
 
 std::unique_ptr<Event> ClientImpl::PullEvent()

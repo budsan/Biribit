@@ -256,7 +256,6 @@ int main(int argc, char** argv)
 
 		if (server.Run(iPort, name.empty() ? nullptr : name.c_str(), pass.empty() ? nullptr : pass.c_str(), maxClients))
 		{
-			char c;
 			while (server.isRunning())
 				std::this_thread::sleep_for(std::chrono::seconds(1));
 

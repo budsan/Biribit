@@ -93,7 +93,7 @@ Entry::id_t ConnectionImpl::GetEntriesCount()
 	if (joinedRoom > Room::UNASSIGNED_ID)
 	{
 		std::lock_guard<std::mutex> lock(entriesMutex);
-		return  joinedRoomEntries.size() - 1;
+		return static_cast<Entry::id_t>(joinedRoomEntries.size() - 1);
 	}
 
 	return Entry::UNASSIGNED_ID;

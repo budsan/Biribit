@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 #include <memory>
+#include <future>
 
 #include <Biribit/BiribitConfig.h>
 #include <Biribit/Packet.h>
@@ -11,7 +12,10 @@
 namespace Biribit
 {
 
-typedef std::uint32_t Milliseconds;
+using milliseconds_t = std::uint32_t ;
+using id_t = std::uint32_t;
+enum { UNASSIGNED_ID = 0 };
+template<class T> using future_vector = std::future<std::vector<T>>;
 
 struct API_EXPORT ServerInfo
 {
@@ -28,8 +32,8 @@ struct API_EXPORT ServerInfo
 
 struct API_EXPORT Connection
 {
-	typedef std::uint32_t id_t;
-	enum { UNASSIGNED_ID = 0 };
+	using id_t = Biribit::id_t;
+	enum { UNASSIGNED_ID = Biribit::UNASSIGNED_ID};
 
 	id_t id;
 	std::string name;
@@ -40,8 +44,8 @@ struct API_EXPORT Connection
 
 struct API_EXPORT RemoteClient
 {
-	typedef std::uint32_t id_t;
-	enum { UNASSIGNED_ID = 0 };
+	using id_t = Biribit::id_t;
+	enum { UNASSIGNED_ID = Biribit::UNASSIGNED_ID };
 
 	id_t id;
 	std::string name;
@@ -61,8 +65,9 @@ struct API_EXPORT ClientParameters
 
 struct API_EXPORT Room
 {
-	typedef std::uint32_t id_t;
-	enum { UNASSIGNED_ID = 0 };
+	using id_t = Biribit::id_t;
+	using slot_id_t = std::uint8_t;
+	enum { UNASSIGNED_ID = Biribit::UNASSIGNED_ID };
 
 	id_t id;
 	std::vector<RemoteClient::id_t> slots;
@@ -72,10 +77,10 @@ struct API_EXPORT Room
 
 struct API_EXPORT Received
 {
-	Milliseconds when;
+	milliseconds_t when;
 	Connection::id_t connection;
 	Room::id_t room_id;
-	std::uint8_t slot_id;
+	Room::slot_id_t slot_id;
 	Packet data;
 
 	Received();
@@ -84,8 +89,8 @@ struct API_EXPORT Received
 
 struct API_EXPORT Entry
 {
-	typedef std::uint32_t id_t;
-	enum { UNASSIGNED_ID = 0 };
+	using id_t = Biribit::id_t;
+	enum { UNASSIGNED_ID = Biribit::UNASSIGNED_ID };
 
 	id_t id;
 	std::uint8_t from_slot;
