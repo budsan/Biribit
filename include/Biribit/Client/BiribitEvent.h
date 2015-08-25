@@ -102,6 +102,7 @@ namespace Biribit
 		// ID_JOURNAL_ENTRIES_STATUS
 
 		Connection::id_t connection;
+		Room::id_t room_id;
 
 		EntriesEvent();
 		virtual ~EntriesEvent();

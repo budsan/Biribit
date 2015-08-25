@@ -14,6 +14,21 @@
 
 template<int N> int sizeof_array(const char (&s)[N]) { return N; }
 
+char* BiribitErrorStrings[] = {
+	"NO_ERROR"
+	"WARN_CLIENT_NAME_IN_USE",
+	"WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID",
+	"WARN_CANNOT_CREATE_ROOM_WITHOUT_APPID",
+	"WARN_CANNOT_CREATE_ROOM_WITH_WRONG_SLOT_NUMBER",
+	"WARN_CANNOT_CREATE_ROOM_WITH_TOO_MANY_SLOTS",
+	"WARN_CANNOT_JOIN_WITHOUT_ROOM_ID",
+	"WARN_CANNOT_JOIN_TO_UNEXISTING_ROOM",
+	"WARN_CANNOT_JOIN_TO_OTHER_APP_ROOM",
+	"WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT",
+	"WARN_CANNOT_JOIN_TO_INVALID_SLOT",
+	"WARN_CANNOT_JOIN_TO_FULL_ROOM"
+};
+
 namespace Client
 {
 
@@ -109,12 +124,13 @@ private:
 		return false;
 	}
 
-	void UpdateEntries(Biribit::Connection::id_t id)
+	void UpdateEntries(Biribit::Connection::id_t id, Biribit::Room::id_t joinedRoom)
 	{
 		if (id >= connectionsInfo.size())
 			connectionsInfo.resize(id + 1);
 
 		ConnectionInfo& info = connectionsInfo[id];
+		info.joined_room = joinedRoom;
 		if (info.joined_room > Biribit::Room::UNASSIGNED_ID)
 		{
 			std::list<std::string>& connectionEntries = info.entries;
@@ -172,7 +188,12 @@ private:
 			case Biribit::TYPE_NONE:
 				break;
 			case Biribit::TYPE_ERROR:
+			{
+				auto error_evnt = unique_ptr_cast<Biribit::ErrorEvent>(evnt);
+				if (console != nullptr)
+					console->print("Error event %s.", BiribitErrorStrings[error_evnt->which]);
 				break;
+			}
 			case Biribit::TYPE_SERVER_LIST:
 				PushFuture(&serverInfo, client->GetFutureServerList().share());
 				break;
@@ -232,15 +253,17 @@ private:
 			case Biribit::TYPE_ENTRIES:
 			{
 				std::unique_ptr<Biribit::EntriesEvent> entry = unique_ptr_cast<Biribit::EntriesEvent>(evnt);
-				UpdateEntries(entry->connection);
+				UpdateEntries(entry->connection, entry->room_id);
 				break;
 			}
 			}
 		}
 
-		for (auto it = tasks.begin(); it != tasks.end(); it++)
+		for (auto it = tasks.begin(); it != tasks.end();)
 			if ((*it)())
 				it = tasks.erase(it);
+			else
+				it++;
 	}
 
 	void OnGUI() override
@@ -338,7 +361,9 @@ private:
 				if (ImGui::Button("Disconnect all"))
 					client->Disconnect();
 			}
-			
+
+			if (connectionId >= connectionsInfo.size())
+				connectionsInfo.resize(connectionId + 1);
 
 			ConnectionInfo& info = connectionsInfo[connectionId];
 			const std::vector<Biribit::RemoteClient>& clients = info.remoteClients;

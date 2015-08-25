@@ -691,7 +691,6 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		case WARN_CANNOT_JOIN_TO_FULL_ROOM:
 			printLog("Error code WARN_CANNOT_JOIN_TO_FULL_ROOM"); break;
 		}
-		break;
 
 		std::unique_ptr<ErrorEvent> ev = std::unique_ptr<ErrorEvent>(new ErrorEvent());
 		ev->which = (ErrorType)errorCode;
@@ -699,6 +698,8 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			std::lock_guard<std::mutex> lock(m_eventMutex);
 			m_eventQueue.push(std::move(ev));
 		}
+
+		break;
 	}
 	case ID_SERVER_INFO_REQUEST:
 		BIRIBIT_WARN("Nothing to do with ID_SERVER_INFO_REQUEST");
@@ -890,8 +891,17 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 					m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE, 0, sc.addr, false);
 					proto_entriesReq = unique<Proto::RoomEntriesRequest>(proto_entriesReqPtr);
 				}
+
+				std::unique_ptr<EntriesEvent> entr(new EntriesEvent());
+				entr->connection = si.id;
+				entr->room_id = sc.joinedRoom;
+				{
+					std::lock_guard<std::mutex> lock(m_eventMutex);
+					m_eventQueue.push(std::move(entr));
+				}
 			}
 		}
+
 		break;
 	}
 	case ID_SEND_ENTRY_TO_ROOM:
