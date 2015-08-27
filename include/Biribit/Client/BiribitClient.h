@@ -29,10 +29,10 @@ public:
 	void ClearServerList();
 	void RefreshServerList();
 
-	future_vector<ServerInfo> GetFutureServerList();
-	future_vector<Connection> GetFutureConnections();
-	future_vector<RemoteClient> GetFutureRemoteClients(Connection::id_t id);
-	future_vector<Room> GetFutureRooms(Connection::id_t id);
+	future_vector<ServerInfo> GetServerList();
+	future_vector<Connection> GetConnections();
+	future_vector<RemoteClient> GetRemoteClients(Connection::id_t id);
+	future_vector<Room> GetRooms(Connection::id_t id);
 
 	/*
 	const std::vector<ServerInfo>& GetServerList(std::uint32_t* revision = nullptr);

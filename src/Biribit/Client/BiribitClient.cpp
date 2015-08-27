@@ -43,48 +43,25 @@ void Client::RefreshServerList()
 	m_impl->RefreshServerList();
 }
 
-std::future<std::vector<ServerInfo>> Client::GetFutureServerList()
+std::future<std::vector<ServerInfo>> Client::GetServerList()
 {
-	return m_impl->GetFutureServerList();
+	return m_impl->GetServerList();
 }
 
-std::future<std::vector<Connection>> Client::GetFutureConnections()
+std::future<std::vector<Connection>> Client::GetConnections()
 {
-	return m_impl->GetFutureConnections();
+	return m_impl->GetConnections();
 }
 
-std::future<std::vector<RemoteClient>> Client::GetFutureRemoteClients(Connection::id_t id)
+std::future<std::vector<RemoteClient>> Client::GetRemoteClients(Connection::id_t id)
 {
-	return m_impl->GetFutureRemoteClients(id);
+	return m_impl->GetRemoteClients(id);
 }
 
-future_vector<Room> Client::GetFutureRooms(Connection::id_t id)
+future_vector<Room> Client::GetRooms(Connection::id_t id)
 {
-	return m_impl->GetFutureRooms(id);
+	return m_impl->GetRooms(id);
 }
-
-/*
-const std::vector<ServerInfo>& Client::GetServerList(std::uint32_t* revision)
-{
-	return m_impl->GetServerList(revision);
-}
-
-const std::vector<Connection>& Client::GetConnections(std::uint32_t* revision)
-{
-	return m_impl->GetConnections(revision);
-}
-
-const std::vector<RemoteClient>& Client::GetRemoteClients(Connection::id_t id, std::uint32_t* revision)
-{
-	return m_impl->GetRemoteClients(id, revision);
-}
-
-const std::vector<Room>& Client::GetRooms(Connection::id_t id, std::uint32_t* revision)
-{
-return m_impl->GetRooms(id, revision);
-}
-
-*/
 
 RemoteClient::id_t Client::GetLocalClientId(Connection::id_t id)
 {

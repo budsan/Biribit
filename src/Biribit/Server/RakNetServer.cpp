@@ -182,6 +182,13 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 			else
 			{
 				printLog("Client(%d) \"%s\" changed name to \"%s\".", client->id, client->name.c_str(), current_name.c_str());
+
+				if (!client->name.empty())
+				{
+					std::size_t erased_count = m_clientNameMap.erase(client->name);
+					BIRIBIT_ASSERT(erased_count > 0);
+				}
+
 				m_clientNameMap[current_name] = client->id;
 				client->name = current_name;
 				updated = true;

@@ -84,10 +84,6 @@ void ClientImpl::RakNetUpdated()
 			HandlePacket(p);
 			m_peer->DeallocatePacket(p);
 		}
-
-		m_current = RakNet::GetTimeMS();
-		if ((m_current - m_lastDirtyDueTime) > 1000)
-			UpdateConnections();
 	});
 }
 
@@ -175,12 +171,12 @@ void ClientImpl::ClearServerList()
 		}
 
 		if (modified)
-			UpdateServerList();
+			PushServerListEvent();
 	});
 }
 
 
-std::future<std::vector<ServerInfo>> ClientImpl::GetFutureServerList()
+std::future<std::vector<ServerInfo>> ClientImpl::GetServerList()
 {
 	return m_pool->enqueue([this]() -> std::vector<ServerInfo>
 	{
@@ -190,7 +186,7 @@ std::future<std::vector<ServerInfo>> ClientImpl::GetFutureServerList()
 	});
 }
 
-std::future<std::vector<Connection>> ClientImpl::GetFutureConnections()
+std::future<std::vector<Connection>> ClientImpl::GetConnections()
 {
 	return m_pool->enqueue([this]() -> std::vector<Connection>
 	{
@@ -200,7 +196,7 @@ std::future<std::vector<Connection>> ClientImpl::GetFutureConnections()
 	});
 }
 
-std::future<std::vector<RemoteClient>> ClientImpl::GetFutureRemoteClients(Connection::id_t id)
+std::future<std::vector<RemoteClient>> ClientImpl::GetRemoteClients(Connection::id_t id)
 {
 	return m_pool->enqueue([this, id]() -> std::vector<RemoteClient>
 	{
@@ -212,7 +208,7 @@ std::future<std::vector<RemoteClient>> ClientImpl::GetFutureRemoteClients(Connec
 	});
 }
 
-future_vector<Room> ClientImpl::GetFutureRooms(Connection::id_t id)
+future_vector<Room> ClientImpl::GetRooms(Connection::id_t id)
 {
 	return m_pool->enqueue([this, id]() -> std::vector<Room>
 	{
@@ -222,34 +218,6 @@ future_vector<Room> ClientImpl::GetFutureRooms(Connection::id_t id)
 
 		return rooms;
 	});
-}
-
-const std::vector<ServerInfo>& ClientImpl::GetServerList(std::uint32_t* revision)
-{
-	return serverListReq.front(revision);
-}
-
-const std::vector<Connection>& ClientImpl::GetConnections(std::uint32_t* revision)
-{
-	return connectionsListReq.front(revision);
-}
-
-const std::vector<RemoteClient>& ClientImpl::GetRemoteClients(Connection::id_t id, std::uint32_t* revision)
-{
-	static std::vector<RemoteClient> guard;
-	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
-		return guard;
-
-	return m_connections[id].clientsListReq.front(revision);
-}
-
-const std::vector<Room>& ClientImpl::GetRooms(Connection::id_t id, std::uint32_t* revision)
-{
-	static std::vector<Room> guard;
-	if (id == Connection::UNASSIGNED_ID || id > CLIENT_MAX_CONNECTIONS)
-		return guard;
-
-	return m_connections[id].roomsListReq.front(revision);
 }
 
 RemoteClient::id_t ClientImpl::GetLocalClientId(Connection::id_t id)
@@ -607,7 +575,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			{
 				ServerInfoImpl& si = serverList[pPacket->systemAddress];
 				PopulateServerInfo(si, &proto_info);
-				UpdateServerList();
+				PushServerListEvent();
 			}
 		}
 		break;
@@ -619,7 +587,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 
 		ServerInfoImpl& si = serverList[pPacket->systemAddress];
 		si.data.ping = current - pingTime;
-		UpdateServerList();
+		PushServerListEvent();
 
 		Packet tosend;
 		tosend << (RakNet::MessageID) ID_SERVER_INFO_REQUEST;
@@ -666,31 +634,6 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	{
 		std::uint32_t errorCode;
 		stream.Read(errorCode);
-		switch (errorCode)
-		{
-		case WARN_CLIENT_NAME_IN_USE:
-			printLog("Error code WARN_CLIENT_NAME_IN_USE"); break;
-		case WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID:
-			printLog("Error code WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID"); break;
-		case WARN_CANNOT_CREATE_ROOM_WITHOUT_APPID:
-			printLog("Error code WARN_CANNOT_CREATE_ROOM_WITHOUT_APPID"); break;
-		case WARN_CANNOT_CREATE_ROOM_WITH_WRONG_SLOT_NUMBER:
-			printLog("Error code WARN_CANNOT_CREATE_ROOM_WITH_WRONG_SLOT_NUMBER"); break;
-		case WARN_CANNOT_CREATE_ROOM_WITH_TOO_MANY_SLOTS:
-			printLog("Error code WARN_CANNOT_CREATE_ROOM_WITH_TOO_MANY_SLOTS"); break;
-		case WARN_CANNOT_JOIN_WITHOUT_ROOM_ID:
-			printLog("Error code WARN_CANNOT_JOIN_WITHOUT_ROOM_ID"); break;
-		case WARN_CANNOT_JOIN_TO_UNEXISTING_ROOM:
-			printLog("Error code WARN_CANNOT_JOIN_TO_UNEXISTING_ROOM"); break;
-		case WARN_CANNOT_JOIN_TO_OTHER_APP_ROOM:
-			printLog("Error code WARN_CANNOT_JOIN_TO_OTHER_APP_ROOM"); break;
-		case WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT:
-			printLog("Error code WARN_CANNOT_JOIN_TO_OCCUPIED_SLOT"); break;
-		case WARN_CANNOT_JOIN_TO_INVALID_SLOT:
-			printLog("Error code WARN_CANNOT_JOIN_TO_INVALID_SLOT"); break;
-		case WARN_CANNOT_JOIN_TO_FULL_ROOM:
-			printLog("Error code WARN_CANNOT_JOIN_TO_FULL_ROOM"); break;
-		}
 
 		std::unique_ptr<ErrorEvent> ev = std::unique_ptr<ErrorEvent>(new ErrorEvent());
 		ev->which = (ErrorType)errorCode;
@@ -698,7 +641,6 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			std::lock_guard<std::mutex> lock(m_eventMutex);
 			m_eventQueue.push(std::move(ev));
 		}
-
 		break;
 	}
 	case ID_SERVER_INFO_REQUEST:
@@ -715,10 +657,10 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			{
 				ConnectionImpl& sc = m_connections[si.id];
 				sc.data.name = proto_info.name();
-				UpdateConnections();
+				PushConnectionsEvent();
 			}
 
-			UpdateServerList();
+			PushServerListEvent();
 		}
 
 		break;
@@ -727,7 +669,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	{
 		Proto::Client proto_client;
 		if (ReadMessage(proto_client, stream))
-			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_SELF_CLIENT);
+			UpdateRemoteClient(pPacket->systemAddress, &proto_client, RemoteClientEvent::UPDATE_SELF_CLIENT);
 		break;
 	}
 	case ID_SERVER_STATUS_REQUEST:
@@ -755,7 +697,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 					PopulateRemoteClient(sc.clients[proto_client.id()], &proto_client);
 			}
 
-			sc.UpdateRemoteClients();
+			sc.PushRemoteClientsEvent();
 		}
 		break;
 	}
@@ -766,14 +708,14 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	{
 		Proto::Client proto_client;
 		if (ReadMessage(proto_client, stream))
-			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_REMOTE_CLIENT);
+			UpdateRemoteClient(pPacket->systemAddress, &proto_client, RemoteClientEvent::UPDATE_REMOTE_CLIENT);
 		break;
 	}
 	case ID_CLIENT_DISCONNECTED:
 	{
 		Proto::Client proto_client;
 		if (ReadMessage(proto_client, stream))
-			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_REMOTE_DISCONNECTION);
+			UpdateRemoteClient(pPacket->systemAddress, &proto_client, RemoteClientEvent::DISCONNECTION);
 		break;
 	}
 	case ID_ROOM_LIST_REQUEST:
@@ -801,7 +743,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 					PopulateRoom(sc.rooms[proto_room.id()], &proto_room);
 			}
 
-			sc.UpdateRooms();
+			sc.PushRoomListEvent();
 		}
 		break;
 	}
@@ -836,6 +778,15 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 
 				if (proto_join.has_slot_to_join())
 					sc.joinedSlot = proto_join.slot_to_join();
+			}
+
+			std::unique_ptr<JoinedRoomEvent> entr(new JoinedRoomEvent());
+			entr->connection = si.id;
+			entr->room_id = sc.joinedRoom;
+			entr->slot_id = sc.joinedSlot;
+			{
+				std::lock_guard<std::mutex> lock(m_eventMutex);
+				m_eventQueue.push(std::move(entr));
 			}
 		}
 		break;
@@ -937,7 +888,7 @@ void ClientImpl::ConnectedAt(RakNet::SystemAddress addr)
 	SendProtocolMessageID(ID_SERVER_INFO_REQUEST, addr);
 	SendProtocolMessageID(ID_SERVER_STATUS_REQUEST, addr);
 
-	UpdateConnections();
+	PushConnectionsEvent();
 }
 
 void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
@@ -951,10 +902,10 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 
 	sc.Clear();
 	si.id = Connection::UNASSIGNED_ID;
-	UpdateConnections();
+	PushConnectionsEvent();
 }
 
-void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type)
+void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, RemoteClientEvent::TypeClientEvent type)
 {
 	ServerInfoImpl& si = serverList[addr];
 	BIRIBIT_ASSERT(si.id != Connection::UNASSIGNED_ID);
@@ -966,20 +917,32 @@ void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Cli
 		if (id >= sc.clients.size())
 			sc.clients.resize(id + 1);
 
+		bool self = false;
+		auto ev = std::unique_ptr<RemoteClientEvent>(new RemoteClientEvent());
+		ev->connection = si.id;
+		ev->typeRemoteClient = type;
+
 		switch (type)
 		{
-		case UPDATE_SELF_CLIENT:
+		case RemoteClientEvent::UPDATE_SELF_CLIENT:
 			sc.selfId = id;
-		case UPDATE_REMOTE_CLIENT:
+			self = true;
+		case RemoteClientEvent::UPDATE_REMOTE_CLIENT:
 			PopulateRemoteClient(sc.clients[id], proto_client);
+			ev->client.appid = sc.clients[id].appid;
+			ev->client.id = sc.clients[id].id;
+			ev->client.name = sc.clients[id].name;
 			break;
-		case UPDATE_REMOTE_DISCONNECTION:
+		case RemoteClientEvent::DISCONNECTION:
+			ev->client.id = id;
 			sc.clients[id].id = RemoteClient::UNASSIGNED_ID;
-			sc.selfId = sc.selfId == id ? RemoteClient::UNASSIGNED_ID : sc.selfId;
+			self = (sc.selfId == id);
+			sc.selfId = self ? RemoteClient::UNASSIGNED_ID : sc.selfId;
 			break;
 		}
 
-		sc.UpdateRemoteClients();
+		if (!self)
+			PushEvent(std::move(ev));
 	}
 }
 
@@ -995,7 +958,7 @@ void ClientImpl::UpdateRoom(RakNet::SystemAddress addr, const Proto::Room* proto
 			sc.rooms.resize(id + 1);
 
 		PopulateRoom(sc.rooms[id], proto_room);
-		sc.UpdateRooms();
+		sc.PushRoomListEvent();
 	}
 }
 
@@ -1074,21 +1037,14 @@ void ClientImpl::UpdateConnections(std::vector<Connection>& vect)
 	}
 }
 
-void ClientImpl::UpdateServerList()
+void ClientImpl::PushServerListEvent()
 {
 	PushEvent(std::unique_ptr<ServerListEvent>(new ServerListEvent()));
-
-	UpdateServerList(serverListReq.back());
-	serverListReq.swap();
 }
 
-void ClientImpl::UpdateConnections()
+void ClientImpl::PushConnectionsEvent()
 {
 	PushEvent(std::unique_ptr<ConnectionEvent>(new ConnectionEvent()));
-
-	UpdateConnections(connectionsListReq.back());
-	connectionsListReq.swap();
-	RakNet::TimeMS m_lastDirtyDueTime = RakNet::GetTimeMS();
 }
 
 } // namespace Biribit

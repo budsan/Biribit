@@ -16,8 +16,8 @@ ServerListEvent::~ServerListEvent() {}
 ConnectionEvent::ConnectionEvent() : Event(TYPE_CONNECTION) {}
 ConnectionEvent::~ConnectionEvent() {}
 
-RemoteClientsEvent::RemoteClientsEvent() : Event(TYPE_REMOTE_CLIENTS) {}
-RemoteClientsEvent::~RemoteClientsEvent() {}
+RemoteClientEvent::RemoteClientEvent() : Event(TYPE_REMOTE_CLIENT) {}
+RemoteClientEvent::~RemoteClientEvent() {}
 
 RoomListEvent::RoomListEvent() : Event(TYPE_ROOM_LIST) {}
 RoomListEvent::~RoomListEvent() {}

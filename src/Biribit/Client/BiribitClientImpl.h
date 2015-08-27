@@ -4,7 +4,6 @@
 #include <Biribit/Common/PrintLog.h>
 #include <Biribit/Common/BiribitMessageIdentifiers.h>
 #include <Biribit/Common/Debug.h>
-#include <Biribit/Common/RefSwap.h>
 #include <Biribit/Common/TaskPool.h>
 #include <Biribit/Common/Types.h>
 #include <Biribit/Common/Generic.h>
@@ -48,15 +47,10 @@ public:
 	void ClearServerList();
 	void RefreshServerList();
 
-	future_vector<ServerInfo> GetFutureServerList();
-	future_vector<Connection> GetFutureConnections();
-	future_vector<RemoteClient> GetFutureRemoteClients(Connection::id_t id);
-	future_vector<Room> GetFutureRooms(Connection::id_t id);
-
-	const std::vector<ServerInfo>& GetServerList(std::uint32_t* revision);
-	const std::vector<Connection>& GetConnections(std::uint32_t* revision);
-	const std::vector<RemoteClient>& GetRemoteClients(Connection::id_t id, std::uint32_t* revision);
-	const std::vector<Room>& GetRooms(Connection::id_t id, std::uint32_t* revision);
+	future_vector<ServerInfo> GetServerList();
+	future_vector<Connection> GetConnections();
+	future_vector<RemoteClient> GetRemoteClients(Connection::id_t id);
+	future_vector<Room> GetRooms(Connection::id_t id);
 
 	RemoteClient::id_t GetLocalClientId(Connection::id_t id);
 	void SetLocalClientParameters(Connection::id_t id, const ClientParameters& parameters);
@@ -105,8 +99,7 @@ private:
 	void ConnectedAt(RakNet::SystemAddress);
 	void DisconnectFrom(RakNet::SystemAddress);
 
-	enum TypeUpdateRemoteClient { UPDATE_REMOTE_CLIENT, UPDATE_SELF_CLIENT, UPDATE_REMOTE_DISCONNECTION };
-	void UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type);
+	void UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, RemoteClientEvent::TypeClientEvent type);
 	void UpdateRoom(RakNet::SystemAddress addr, const Proto::Room* proto_room);
 
 	static void PopulateServerInfo(ServerInfoImpl&, const Proto::ServerInfo*);
@@ -115,18 +108,13 @@ private:
 
 	void UpdateServerList(std::vector<ServerInfo>& vect);
 	void UpdateConnections(std::vector<Connection>& vect);
-	void UpdateServerList();
-	void UpdateConnections();
+	void PushServerListEvent();
+	void PushConnectionsEvent();
 
 	Generic::TempBuffer m_buffer;
 
 	std::map<RakNet::SystemAddress, ServerInfoImpl> serverList;
-	RefSwap<std::vector<ServerInfo>> serverListReq;
-
 	std::array<ConnectionImpl, CLIENT_MAX_CONNECTIONS + 1> m_connections;
-	RefSwap<std::vector<Connection>> connectionsListReq;
-	RakNet::TimeMS m_current;
-	RakNet::TimeMS m_lastDirtyDueTime;
 
 	std::queue<std::unique_ptr<Event>> m_eventQueue;
 	std::mutex m_eventMutex;

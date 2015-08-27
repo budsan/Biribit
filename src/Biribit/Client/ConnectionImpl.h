@@ -33,14 +33,12 @@ public:
 	RemoteClient::id_t selfId;
 
 	std::vector<RemoteClient> clients;
-	RefSwap<std::vector<RemoteClient>> clientsListReq;
-
 	std::vector<Room> rooms;
-	RefSwap<std::vector<Room>> roomsListReq;
 
 	Room::id_t joinedRoom;
 	Room::slot_id_t joinedSlot;
 
+	//TODO: I would like to change this.
 	std::vector<RefSwap<Entry>> joinedRoomEntries;
 	std::mutex entriesMutex;
 
@@ -57,8 +55,8 @@ public:
 
 	void UpdateRemoteClients(std::vector<RemoteClient>& vect);
 	void UpdateRooms(std::vector<Room>& vect);
-	void UpdateRemoteClients(bool pushEvent = true);
-	void UpdateRooms(bool pushEvent = true);
+	void PushRemoteClientsEvent();
+	void PushRoomListEvent();
 };
 
 } // namespace Biribit

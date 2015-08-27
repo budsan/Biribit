@@ -26,10 +26,7 @@ void ConnectionImpl::Clear()
 	ResetEntries();
 
 	clients.clear();
-	UpdateRemoteClients(false);
-
 	rooms.clear();
-	UpdateRooms(false);
 }
 
 bool ConnectionImpl::isNull()
@@ -134,30 +131,19 @@ void ConnectionImpl::UpdateRooms(std::vector<Room>& vect)
 			vect.push_back(*it);
 }
 
-void ConnectionImpl::UpdateRemoteClients(bool pushEvent)
+void ConnectionImpl::PushRemoteClientsEvent()
 {
-	if (pushEvent)
-	{
-		auto ev = std::unique_ptr<RemoteClientsEvent>(new RemoteClientsEvent());
-		ev->connection = data.id;
-		parent->PushEvent(std::move(ev));
-	}
-
-	UpdateRemoteClients(clientsListReq.back());
-	clientsListReq.swap();
+	auto ev = std::unique_ptr<RemoteClientEvent>(new RemoteClientEvent());
+	ev->connection = data.id;
+	parent->PushEvent(std::move(ev));
 }
 
-void ConnectionImpl::UpdateRooms(bool pushEvent)
+void ConnectionImpl::PushRoomListEvent()
 {
-	if (pushEvent)
-	{
-		auto ev = std::unique_ptr<RoomListEvent>(new RoomListEvent());
-		ev->connection = data.id;
-		parent->PushEvent(std::move(ev));
-	}
-	
-	UpdateRooms(roomsListReq.back());
-	roomsListReq.swap();
+	auto ev = std::unique_ptr<RoomListEvent>(new RoomListEvent());
+	ev->connection = data.id;
+	UpdateRooms(ev->rooms);
+	parent->PushEvent(std::move(ev));
 }
 
 } // namespace Biribit

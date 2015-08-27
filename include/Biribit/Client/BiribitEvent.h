@@ -11,7 +11,7 @@ namespace Biribit
 		TYPE_ERROR,
 		TYPE_SERVER_LIST,
 		TYPE_CONNECTION,
-		TYPE_REMOTE_CLIENTS,
+		TYPE_REMOTE_CLIENT,
 		TYPE_ROOM_LIST,
 		TYPE_JOINED_ROOM,
 		TYPE_BROADCAST,
@@ -52,16 +52,20 @@ namespace Biribit
 		virtual ~ConnectionEvent();
 	};
 
-	struct API_EXPORT RemoteClientsEvent : public Event
+	struct API_EXPORT RemoteClientEvent : public Event
 	{
-		// ID_SERVER_STATUS_RESPONSE
-		// ID_CLIENT_STATUS_UPDATED
-		// ID_CLIENT_DISCONNECTED
+		enum TypeClientEvent {
+			UPDATE_SELF_CLIENT,
+			UPDATE_REMOTE_CLIENT,
+			DISCONNECTION
+		};
 
 		Connection::id_t connection;
+		TypeClientEvent typeRemoteClient;
+		RemoteClient client;
 
-		RemoteClientsEvent();
-		virtual ~RemoteClientsEvent();
+		RemoteClientEvent();
+		virtual ~RemoteClientEvent();
 	};
 
 	struct API_EXPORT RoomListEvent : public Event
@@ -69,6 +73,7 @@ namespace Biribit
 		// ID_ROOM_LIST_RESPONSE
 
 		Connection::id_t connection;
+		std::vector<Room> rooms;
 
 		RoomListEvent();
 		virtual ~RoomListEvent();
@@ -80,6 +85,8 @@ namespace Biribit
 		// ID_ROOM_JOIN_RESPONSE
 
 		Connection::id_t connection;
+		Room::id_t room_id;
+		std::uint8_t slot_id;
 
 		JoinedRoomEvent();
 		virtual ~JoinedRoomEvent();

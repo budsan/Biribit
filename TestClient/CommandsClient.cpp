@@ -15,7 +15,7 @@
 template<int N> int sizeof_array(const char (&s)[N]) { return N; }
 
 char* BiribitErrorStrings[] = {
-	"NO_ERROR"
+	"NO_ERROR",
 	"WARN_CLIENT_NAME_IN_USE",
 	"WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID",
 	"WARN_CANNOT_CREATE_ROOM_WITHOUT_APPID",
@@ -186,6 +186,8 @@ private:
 			switch (evnt->type)
 			{
 			case Biribit::TYPE_NONE:
+				if (console != nullptr)
+					console->print("Received none event.");
 				break;
 			case Biribit::TYPE_ERROR:
 			{
@@ -195,19 +197,38 @@ private:
 				break;
 			}
 			case Biribit::TYPE_SERVER_LIST:
-				PushFuture(&serverInfo, client->GetFutureServerList().share());
+				PushFuture(&serverInfo, client->GetServerList().share());
+				if (console != nullptr)
+					console->print("Server list changed.");
 				break;
 			case Biribit::TYPE_CONNECTION:
-				PushFuture(&connections, client->GetFutureConnections().share());
+				PushFuture(&connections, client->GetConnections().share());
+				
 				break;
-			case Biribit::TYPE_REMOTE_CLIENTS:
+			case Biribit::TYPE_REMOTE_CLIENT:
 			{
-				auto rc_evnt = unique_ptr_cast<Biribit::RemoteClientsEvent>(evnt);
+				auto rc_evnt = unique_ptr_cast<Biribit::RemoteClientEvent>(evnt);
 				auto id = rc_evnt->connection;
 				if (id >= connectionsInfo.size())
 					connectionsInfo.resize(id + 1);
 
-				PushFuture(&connectionsInfo[id].remoteClients, client->GetFutureRemoteClients(id).share());
+				switch (rc_evnt->typeRemoteClient)
+				{
+				case Biribit::RemoteClientEvent::UPDATE_SELF_CLIENT:
+					if (console != nullptr) console->print("Local client updated ID: %d. Name: %s, AppId: %s.", rc_evnt->client.id, rc_evnt->client.name.c_str(), rc_evnt->client.appid.c_str());
+					break;
+				case Biribit::RemoteClientEvent::UPDATE_REMOTE_CLIENT:
+					if (console != nullptr) console->print("Client updated ID: %d. Name: %s, AppId: %s.", rc_evnt->client.id, rc_evnt->client.name.c_str(), rc_evnt->client.appid.c_str());
+					break;
+				case Biribit::RemoteClientEvent::DISCONNECTION:
+					if (console != nullptr) console->print("Client disconnected ID: %d. Name: %s, AppId: %s.", rc_evnt->client.id, rc_evnt->client.name.c_str(), rc_evnt->client.appid.c_str());
+				default:
+					break;
+				}
+
+				
+
+				PushFuture(&connectionsInfo[id].remoteClients, client->GetRemoteClients(id).share());
 				break;
 			}
 			case Biribit::TYPE_ROOM_LIST:
@@ -217,7 +238,11 @@ private:
 				if (id >= connectionsInfo.size())
 					connectionsInfo.resize(id + 1);
 
-				PushFuture(&connectionsInfo[id].rooms, client->GetFutureRooms(id).share());
+				connectionsInfo[id].rooms = std::move(rl_evnt->rooms);
+
+				if (console != nullptr)
+					console->print("Room list updated!");
+
 				break;
 			}
 				break;
@@ -229,9 +254,12 @@ private:
 					connectionsInfo.resize(id + 1);
 
 				ConnectionInfo& info = connectionsInfo[id];
-				info.joined_room = client->GetJoinedRoomId(id);
-				info.joined_room_slot = client->GetJoinedRoomSlot(id);
+				info.joined_room = jr_evnt->room_id;
+				info.joined_room_slot = jr_evnt->slot_id;
 				info.entries.clear();
+
+				if (console != nullptr)
+					console->print("Joined room %d, slot %d.", info.joined_room, info.joined_room_slot);
 
 				break;
 			}
@@ -530,7 +558,6 @@ public:
 
 		return client;
 	}
-
 };
 
 ClientUpdater updater;
