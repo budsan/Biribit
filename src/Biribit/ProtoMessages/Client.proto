@@ -7,6 +7,7 @@ message Client
 	required uint32 id = 1;
 	required string name = 2;
 	optional string appid = 3;
+	optional bool self = 4; 
 }
 
 message ClientUpdate

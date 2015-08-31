@@ -74,7 +74,12 @@ public:
 	void SendEntry(Connection::id_t id, const Packet& packet);
 	void SendEntry(Connection::id_t id, const char* data, unsigned int lenght);
 
-	void PushEvent(std::unique_ptr<Event>);
+	template<class T> void PushEvent(std::unique_ptr<T> to_push)
+	{
+		std::lock_guard<std::mutex> lock(m_eventMutex);
+		m_eventQueue.push(std::move(to_push));
+	}
+
 	std::unique_ptr<Event> PullEvent();
 
 	Entry::id_t GetEntriesCount(Connection::id_t id);
@@ -99,7 +104,8 @@ private:
 	void ConnectedAt(RakNet::SystemAddress);
 	void DisconnectFrom(RakNet::SystemAddress);
 
-	void UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, RemoteClientEvent::TypeClientEvent type);
+	enum TypeUpdateRemoteClient { UPDATE_CLIENT, UPDATE_DISCONNECTION };
+	void UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type);
 	void UpdateRoom(RakNet::SystemAddress addr, const Proto::Room* proto_room);
 
 	static void PopulateServerInfo(ServerInfoImpl&, const Proto::ServerInfo*);
@@ -109,7 +115,7 @@ private:
 	void UpdateServerList(std::vector<ServerInfo>& vect);
 	void UpdateConnections(std::vector<Connection>& vect);
 	void PushServerListEvent();
-	void PushConnectionsEvent();
+	void PushConnectionsEvent(Connection::id_t id, ConnectionEvent::EventType type);
 
 	Generic::TempBuffer m_buffer;
 

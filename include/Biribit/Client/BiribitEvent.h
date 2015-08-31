@@ -45,6 +45,16 @@ namespace Biribit
 
 	struct API_EXPORT ConnectionEvent : public Event
 	{
+		enum EventType
+		{
+			NEW_CONNECTION,
+			DISCONNECTION,
+			UPDATED_SERVER_NAME
+		};
+
+		EventType what;
+		Connection connection;
+
 		// ID_CLIENT_SELF_STATUS
 		// when DisconnectFrom is called
 
@@ -54,15 +64,16 @@ namespace Biribit
 
 	struct API_EXPORT RemoteClientEvent : public Event
 	{
-		enum TypeClientEvent {
-			UPDATE_SELF_CLIENT,
-			UPDATE_REMOTE_CLIENT,
+		enum EventType
+		{
+			UPDATE_CLIENT,
 			DISCONNECTION
 		};
 
+		EventType what;
 		Connection::id_t connection;
-		TypeClientEvent typeRemoteClient;
 		RemoteClient client;
+		bool self;
 
 		RemoteClientEvent();
 		virtual ~RemoteClientEvent();

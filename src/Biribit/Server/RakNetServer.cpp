@@ -116,19 +116,7 @@ RakNetServer::Client::id_t RakNetServer::NewClient(RakNet::SystemAddress addr)
 			perm_name++;
 	}
 
-	Proto::Client proto_client;
-	PopulateProtoClient(m_clients[i], &proto_client);
-	{
-		RakNet::BitStream bstream;
-		if (WriteMessage(bstream, ID_CLIENT_STATUS_UPDATED, proto_client))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
-	}
-	{
-		RakNet::BitStream bstream;
-		if (WriteMessage(bstream, ID_CLIENT_SELF_STATUS, proto_client))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
-	}
-
+	SendClientStatusUpdated(m_clients[i], addr);
 	return i;
 }
 
@@ -178,6 +166,8 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 			{
 				if (client->id != itName->second)
 					already_used = true;
+				else
+					success = true;
 			}
 			else
 			{
@@ -213,12 +203,26 @@ void RakNetServer::UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate*
 	}
 
 	if (updated)
+		SendClientStatusUpdated(client, addr);
+}
+
+void RakNetServer::SendClientStatusUpdated(unique<Client>& client, RakNet::SystemAddress addr)
+{
+	Proto::Client proto_client;
+	PopulateProtoClient(client, &proto_client);
 	{
-		Proto::Client proto_client;
-		PopulateProtoClient(client, &proto_client);
 		RakNet::BitStream bstream;
 		if (WriteMessage(bstream, ID_CLIENT_STATUS_UPDATED, proto_client))
-			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+			for (auto it = m_clients.begin(); it != m_clients.end(); it++)
+				if ((*it) != nullptr && (*it)->addr != addr)
+					m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, (*it)->addr, false);
+	}
+
+	proto_client.set_self(true);
+	{
+		RakNet::BitStream bstream;
+		if (WriteMessage(bstream, ID_CLIENT_STATUS_UPDATED, proto_client))
+			m_peer->Send(&bstream, LOW_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
 	}
 }
 
@@ -746,9 +750,6 @@ void RakNetServer::HandlePacket(RakNet::Packet* p)
 	}
 	case ID_SERVER_INFO_RESPONSE:
 		BIRIBIT_WARN("Nothing to do with ID_SERVER_INFO_RESPONSE");
-		break;
-	case ID_CLIENT_SELF_STATUS:
-		BIRIBIT_WARN("Nothing to do with ID_CLIENT_SELF_STATUS");
 		break;
 	case ID_SERVER_STATUS_REQUEST:
 	{

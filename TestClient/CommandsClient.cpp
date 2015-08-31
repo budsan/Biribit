@@ -64,6 +64,17 @@ class ClientUpdater : public UpdaterListener
 
 		std::list<std::string> chats;
 		std::list<std::string> entries;
+
+		void Clear()
+		{
+			remoteClients.clear();
+			rooms.clear();
+			joined_room = 0;
+			joined_room_slot = 0;
+
+			chats.clear();
+			entries.clear();
+		}
 	};
 
 	std::vector<ConnectionInfo> connectionsInfo;
@@ -108,16 +119,22 @@ private:
 
 	template<class T> void PushFuture(T* dst, std::shared_future<T> src)
 	{
-		tasks.push_back([this, dst, src]() -> bool { return HandleFuture<T>(dst, src); });
+		tasks.push_back([this, dst, src]() -> bool { return HandleFuture<T>(dst, src, [](){}); });
 	}
 
-	template<class T> bool HandleFuture(T* dst, std::shared_future<T> src)
+	template<class T> void PushFuture(T* dst, std::shared_future<T> src, std::function<void()> then)
+	{
+		tasks.push_back([this, dst, src]() -> bool { return HandleFuture<T>(dst, src, then); });
+	}
+
+	template<class T> bool HandleFuture(T* dst, std::shared_future<T> src, std::function<void()> then)
 	{
 		if (!src.valid())
 			return true;
 
 		if (src.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
 			(*dst) = src.get();
+			then();
 			return true;
 		}
 
@@ -126,9 +143,6 @@ private:
 
 	void UpdateEntries(Biribit::Connection::id_t id, Biribit::Room::id_t joinedRoom)
 	{
-		if (id >= connectionsInfo.size())
-			connectionsInfo.resize(id + 1);
-
 		ConnectionInfo& info = connectionsInfo[id];
 		info.joined_room = joinedRoom;
 		if (info.joined_room > Biribit::Room::UNASSIGNED_ID)
@@ -202,31 +216,65 @@ private:
 					console->print("Server list changed.");
 				break;
 			case Biribit::TYPE_CONNECTION:
+			{
+				auto cn_evnt = unique_ptr_cast<Biribit::ConnectionEvent>(evnt);
 				PushFuture(&connections, client->GetConnections().share());
+
+
+				switch (cn_evnt->what)
+				{
+				case Biribit::ConnectionEvent::NEW_CONNECTION:
+					if (console != nullptr)
+						console->print("Successfully connected!");
+
+					if (cn_evnt->connection.id >= connectionsInfo.size())
+						connectionsInfo.resize(cn_evnt->connection.id + 1);
+
+					break;
+				case Biribit::ConnectionEvent::DISCONNECTION:
+					if (console != nullptr)
+						console->print("Disconnected!");
+
+					connectionsInfo[cn_evnt->connection.id].Clear();
+
+					break;
+				case Biribit::ConnectionEvent::UPDATED_SERVER_NAME:
+					if (console != nullptr)
+						console->print("Welcome to %s!", cn_evnt->connection.name.c_str());
+					break;
+				}
 				
 				break;
+			}
 			case Biribit::TYPE_REMOTE_CLIENT:
 			{
 				auto rc_evnt = unique_ptr_cast<Biribit::RemoteClientEvent>(evnt);
 				auto id = rc_evnt->connection;
-				if (id >= connectionsInfo.size())
-					connectionsInfo.resize(id + 1);
+				Biribit::RemoteClient& cl = rc_evnt->client;
 
-				switch (rc_evnt->typeRemoteClient)
+				switch (rc_evnt->what)
 				{
-				case Biribit::RemoteClientEvent::UPDATE_SELF_CLIENT:
-					if (console != nullptr) console->print("Local client updated ID: %d. Name: %s, AppId: %s.", rc_evnt->client.id, rc_evnt->client.name.c_str(), rc_evnt->client.appid.c_str());
-					break;
-				case Biribit::RemoteClientEvent::UPDATE_REMOTE_CLIENT:
-					if (console != nullptr) console->print("Client updated ID: %d. Name: %s, AppId: %s.", rc_evnt->client.id, rc_evnt->client.name.c_str(), rc_evnt->client.appid.c_str());
+				case Biribit::RemoteClientEvent::UPDATE_CLIENT:
+					if (console != nullptr)
+					{
+						console->print("%s has been updated ID: %d. Name: %s, AppId: %s.",
+							rc_evnt->self ? "Your data" : "Client's data", 
+							cl.id, cl.name.c_str(),
+							cl.appid.empty() ? "None" :  cl.appid.c_str());
+					}
+						
 					break;
 				case Biribit::RemoteClientEvent::DISCONNECTION:
-					if (console != nullptr) console->print("Client disconnected ID: %d. Name: %s, AppId: %s.", rc_evnt->client.id, rc_evnt->client.name.c_str(), rc_evnt->client.appid.c_str());
+					if (console != nullptr)
+					{
+						console->print("%s been disconnected ID: %d. Name: %s, AppId: %s.",
+							rc_evnt->self ? "You have" : "Client has",
+							cl.id, cl.name.c_str(),
+							cl.appid.empty() ? "None" : cl.appid.c_str());
+					}
 				default:
 					break;
 				}
-
-				
 
 				PushFuture(&connectionsInfo[id].remoteClients, client->GetRemoteClients(id).share());
 				break;
@@ -235,8 +283,6 @@ private:
 			{
 				auto rl_evnt = unique_ptr_cast<Biribit::RoomListEvent>(evnt);
 				auto id = rl_evnt->connection;
-				if (id >= connectionsInfo.size())
-					connectionsInfo.resize(id + 1);
 
 				connectionsInfo[id].rooms = std::move(rl_evnt->rooms);
 
@@ -245,13 +291,10 @@ private:
 
 				break;
 			}
-				break;
 			case Biribit::TYPE_JOINED_ROOM:
 			{
 				auto jr_evnt = unique_ptr_cast<Biribit::JoinedRoomEvent>(evnt);
 				auto id = jr_evnt->connection;
-				if (id >= connectionsInfo.size())
-					connectionsInfo.resize(id + 1);
 
 				ConnectionInfo& info = connectionsInfo[id];
 				info.joined_room = jr_evnt->room_id;
@@ -267,8 +310,6 @@ private:
 			{
 				std::unique_ptr<Biribit::BroadcastEvent> recv = unique_ptr_cast<Biribit::BroadcastEvent>(evnt);
 				auto id = recv->connection;
-				if (id >= connectionsInfo.size())
-					connectionsInfo.resize(id + 1);
 
 				std::stringstream ss;
 				auto secs = recv->when / 1000;
@@ -389,9 +430,6 @@ private:
 				if (ImGui::Button("Disconnect all"))
 					client->Disconnect();
 			}
-
-			if (connectionId >= connectionsInfo.size())
-				connectionsInfo.resize(connectionId + 1);
 
 			ConnectionInfo& info = connectionsInfo[connectionId];
 			const std::vector<Biribit::RemoteClient>& clients = info.remoteClients;
@@ -531,7 +569,6 @@ private:
 				ImGui::PopStyleVar();
 			}
 		}
-
 	
 		ImGui::End();
 	}

@@ -657,19 +657,12 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			{
 				ConnectionImpl& sc = m_connections[si.id];
 				sc.data.name = proto_info.name();
-				PushConnectionsEvent();
+				PushConnectionsEvent(si.id, ConnectionEvent::UPDATED_SERVER_NAME);
 			}
 
 			PushServerListEvent();
 		}
 
-		break;
-	}
-	case ID_CLIENT_SELF_STATUS:
-	{
-		Proto::Client proto_client;
-		if (ReadMessage(proto_client, stream))
-			UpdateRemoteClient(pPacket->systemAddress, &proto_client, RemoteClientEvent::UPDATE_SELF_CLIENT);
 		break;
 	}
 	case ID_SERVER_STATUS_REQUEST:
@@ -708,14 +701,14 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 	{
 		Proto::Client proto_client;
 		if (ReadMessage(proto_client, stream))
-			UpdateRemoteClient(pPacket->systemAddress, &proto_client, RemoteClientEvent::UPDATE_REMOTE_CLIENT);
+			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_CLIENT);
 		break;
 	}
 	case ID_CLIENT_DISCONNECTED:
 	{
 		Proto::Client proto_client;
 		if (ReadMessage(proto_client, stream))
-			UpdateRemoteClient(pPacket->systemAddress, &proto_client, RemoteClientEvent::DISCONNECTION);
+			UpdateRemoteClient(pPacket->systemAddress, &proto_client, UPDATE_DISCONNECTION);
 		break;
 	}
 	case ID_ROOM_LIST_REQUEST:
@@ -888,7 +881,7 @@ void ClientImpl::ConnectedAt(RakNet::SystemAddress addr)
 	SendProtocolMessageID(ID_SERVER_INFO_REQUEST, addr);
 	SendProtocolMessageID(ID_SERVER_STATUS_REQUEST, addr);
 
-	PushConnectionsEvent();
+	PushConnectionsEvent(si.id, ConnectionEvent::NEW_CONNECTION);
 }
 
 void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
@@ -896,16 +889,17 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 	ServerInfoImpl& si = serverList[addr];
 	BIRIBIT_ASSERT(si.id != Connection::UNASSIGNED_ID);
 
-	ConnectionImpl& sc = m_connections[si.id];
+	Connection::id_t id = si.id;
+	ConnectionImpl& sc = m_connections[id];
 	if (si.valid)
 		printLog("Disconnected from %s.", sc.data.name.c_str());
 
 	sc.Clear();
 	si.id = Connection::UNASSIGNED_ID;
-	PushConnectionsEvent();
+	PushConnectionsEvent(id, ConnectionEvent::DISCONNECTION);
 }
 
-void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, RemoteClientEvent::TypeClientEvent type)
+void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type)
 {
 	ServerInfoImpl& si = serverList[addr];
 	BIRIBIT_ASSERT(si.id != Connection::UNASSIGNED_ID);
@@ -917,32 +911,29 @@ void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Cli
 		if (id >= sc.clients.size())
 			sc.clients.resize(id + 1);
 
-		bool self = false;
+		bool self = proto_client->has_self() && proto_client->self();
 		auto ev = std::unique_ptr<RemoteClientEvent>(new RemoteClientEvent());
 		ev->connection = si.id;
-		ev->typeRemoteClient = type;
-
+		
 		switch (type)
 		{
-		case RemoteClientEvent::UPDATE_SELF_CLIENT:
-			sc.selfId = id;
-			self = true;
-		case RemoteClientEvent::UPDATE_REMOTE_CLIENT:
+		case UPDATE_CLIENT:
 			PopulateRemoteClient(sc.clients[id], proto_client);
-			ev->client.appid = sc.clients[id].appid;
-			ev->client.id = sc.clients[id].id;
-			ev->client.name = sc.clients[id].name;
+			if (self) sc.selfId = id;
+			ev->client = sc.clients[id];
+			ev->self = self;
+			ev->what = RemoteClientEvent::UPDATE_CLIENT;
 			break;
-		case RemoteClientEvent::DISCONNECTION:
-			ev->client.id = id;
+		case UPDATE_DISCONNECTION:
+			ev->client = sc.clients[id];
+			ev->self = (sc.selfId == id);
+			ev->what = RemoteClientEvent::DISCONNECTION;
 			sc.clients[id].id = RemoteClient::UNASSIGNED_ID;
-			self = (sc.selfId == id);
-			sc.selfId = self ? RemoteClient::UNASSIGNED_ID : sc.selfId;
+			sc.selfId = ev->self ? RemoteClient::UNASSIGNED_ID : sc.selfId;
 			break;
 		}
 
-		if (!self)
-			PushEvent(std::move(ev));
+		PushEvent(std::move(ev));
 	}
 }
 
@@ -1003,12 +994,6 @@ void ClientImpl::PopulateRoom(Room& room, const Proto::Room* proto_room)
 	}
 }
 
-void ClientImpl::PushEvent(std::unique_ptr<Event> to_push)
-{
-	std::lock_guard<std::mutex> lock(m_eventMutex);
-	m_eventQueue.push(std::move(to_push));
-}
-
 void ClientImpl::UpdateServerList(std::vector<ServerInfo>& vect)
 {
 	vect.clear();
@@ -1042,9 +1027,15 @@ void ClientImpl::PushServerListEvent()
 	PushEvent(std::unique_ptr<ServerListEvent>(new ServerListEvent()));
 }
 
-void ClientImpl::PushConnectionsEvent()
+void ClientImpl::PushConnectionsEvent(Connection::id_t id, ConnectionEvent::EventType type)
 {
-	PushEvent(std::unique_ptr<ConnectionEvent>(new ConnectionEvent()));
+	auto ev = std::unique_ptr<ConnectionEvent>(new ConnectionEvent());
+	ConnectionImpl& sc = m_connections[id];
+	sc.data.ping = m_peer->GetAveragePing(sc.addr);
+	ev->connection = sc.data;
+	ev->what = type;
+
+	PushEvent(std::move(ev));
 }
 
 } // namespace Biribit

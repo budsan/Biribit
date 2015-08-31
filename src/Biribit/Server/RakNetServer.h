@@ -77,6 +77,7 @@ class RakNetServer
 	Client::id_t NewClient(RakNet::SystemAddress addr);
 	void RemoveClient(RakNet::SystemAddress addr);
 	void UpdateClient(RakNet::SystemAddress addr, Proto::ClientUpdate* proto_update);
+	void SendClientStatusUpdated(unique<Client>& client, RakNet::SystemAddress addr);
 
 	void ListRooms(RakNet::SystemAddress addr);
 	void JoinRandomOrCreate(RakNet::SystemAddress addr, Proto::RoomCreate* proto_create);
