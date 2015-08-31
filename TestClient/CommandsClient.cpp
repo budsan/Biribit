@@ -197,33 +197,33 @@ private:
 		std::unique_ptr<Biribit::Event> evnt;
 		while ((evnt = client->PullEvent()) != nullptr)
 		{
-			switch (evnt->type)
+			switch (evnt->id)
 			{
-			case Biribit::TYPE_NONE:
+			case Biribit::EVENT_NONE_ID:
 				if (console != nullptr)
 					console->print("Received none event.");
 				break;
-			case Biribit::TYPE_ERROR:
+			case Biribit::ErrorEvent::EVENT_ID:
 			{
 				auto error_evnt = unique_ptr_cast<Biribit::ErrorEvent>(evnt);
 				if (console != nullptr)
 					console->print("Error event %s.", BiribitErrorStrings[error_evnt->which]);
 				break;
 			}
-			case Biribit::TYPE_SERVER_LIST:
+			case Biribit::ServerListEvent::EVENT_ID:
 				PushFuture(&serverInfo, client->GetServerList().share());
 				if (console != nullptr)
 					console->print("Server list changed.");
 				break;
-			case Biribit::TYPE_CONNECTION:
+			case Biribit::ConnectionEvent::EVENT_ID:
 			{
 				auto cn_evnt = unique_ptr_cast<Biribit::ConnectionEvent>(evnt);
 				PushFuture(&connections, client->GetConnections().share());
 
 
-				switch (cn_evnt->what)
+				switch (cn_evnt->type)
 				{
-				case Biribit::ConnectionEvent::NEW_CONNECTION:
+				case Biribit::ConnectionEvent::TYPE_NEW_CONNECTION:
 					if (console != nullptr)
 						console->print("Successfully connected!");
 
@@ -231,14 +231,14 @@ private:
 						connectionsInfo.resize(cn_evnt->connection.id + 1);
 
 					break;
-				case Biribit::ConnectionEvent::DISCONNECTION:
+				case Biribit::ConnectionEvent::TYPE_DISCONNECTION:
 					if (console != nullptr)
 						console->print("Disconnected!");
 
 					connectionsInfo[cn_evnt->connection.id].Clear();
 
 					break;
-				case Biribit::ConnectionEvent::UPDATED_SERVER_NAME:
+				case Biribit::ConnectionEvent::TYPE_NAME_UPDATED:
 					if (console != nullptr)
 						console->print("Welcome to %s!", cn_evnt->connection.name.c_str());
 					break;
@@ -246,15 +246,20 @@ private:
 				
 				break;
 			}
-			case Biribit::TYPE_REMOTE_CLIENT:
+			case Biribit::ServerStatusEvent::EVENT_ID:
+			{
+				auto ss_evnt = unique_ptr_cast<Biribit::RemoteClientEvent>(evnt);
+				//TODO: Implement client side without getters.
+			}
+			case Biribit::RemoteClientEvent::EVENT_ID:
 			{
 				auto rc_evnt = unique_ptr_cast<Biribit::RemoteClientEvent>(evnt);
 				auto id = rc_evnt->connection;
 				Biribit::RemoteClient& cl = rc_evnt->client;
 
-				switch (rc_evnt->what)
+				switch (rc_evnt->type)
 				{
-				case Biribit::RemoteClientEvent::UPDATE_CLIENT:
+				case Biribit::RemoteClientEvent::TYPE_CLIENT_UPDATED:
 					if (console != nullptr)
 					{
 						console->print("%s has been updated ID: %d. Name: %s, AppId: %s.",
@@ -264,7 +269,7 @@ private:
 					}
 						
 					break;
-				case Biribit::RemoteClientEvent::DISCONNECTION:
+				case Biribit::RemoteClientEvent::TYPE_CLIENT_DISCONNECTED:
 					if (console != nullptr)
 					{
 						console->print("%s been disconnected ID: %d. Name: %s, AppId: %s.",
@@ -279,7 +284,7 @@ private:
 				PushFuture(&connectionsInfo[id].remoteClients, client->GetRemoteClients(id).share());
 				break;
 			}
-			case Biribit::TYPE_ROOM_LIST:
+			case Biribit::RoomListEvent::EVENT_ID:
 			{
 				auto rl_evnt = unique_ptr_cast<Biribit::RoomListEvent>(evnt);
 				auto id = rl_evnt->connection;
@@ -291,7 +296,7 @@ private:
 
 				break;
 			}
-			case Biribit::TYPE_JOINED_ROOM:
+			case Biribit::JoinedRoomEvent::EVENT_ID:
 			{
 				auto jr_evnt = unique_ptr_cast<Biribit::JoinedRoomEvent>(evnt);
 				auto id = jr_evnt->connection;
@@ -306,7 +311,7 @@ private:
 
 				break;
 			}
-			case Biribit::TYPE_BROADCAST:
+			case Biribit::BroadcastEvent::EVENT_ID:
 			{
 				std::unique_ptr<Biribit::BroadcastEvent> recv = unique_ptr_cast<Biribit::BroadcastEvent>(evnt);
 				auto id = recv->connection;
@@ -319,7 +324,7 @@ private:
 				connectionsInfo[id].chats.push_back(ss.str());
 				break;
 			}
-			case Biribit::TYPE_ENTRIES:
+			case Biribit::EntriesEvent::EVENT_ID:
 			{
 				std::unique_ptr<Biribit::EntriesEvent> entry = unique_ptr_cast<Biribit::EntriesEvent>(evnt);
 				UpdateEntries(entry->connection, entry->room_id);

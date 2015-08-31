@@ -636,7 +636,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 		stream.Read(errorCode);
 
 		std::unique_ptr<ErrorEvent> ev = std::unique_ptr<ErrorEvent>(new ErrorEvent());
-		ev->which = (ErrorType)errorCode;
+		ev->which = (ErrorId)errorCode;
 		{
 			std::lock_guard<std::mutex> lock(m_eventMutex);
 			m_eventQueue.push(std::move(ev));
@@ -657,7 +657,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 			{
 				ConnectionImpl& sc = m_connections[si.id];
 				sc.data.name = proto_info.name();
-				PushConnectionsEvent(si.id, ConnectionEvent::UPDATED_SERVER_NAME);
+				PushConnectionsEvent(si.id, ConnectionEvent::TYPE_NAME_UPDATED);
 			}
 
 			PushServerListEvent();
@@ -690,7 +690,7 @@ void ClientImpl::HandlePacket(RakNet::Packet* pPacket)
 					PopulateRemoteClient(sc.clients[proto_client.id()], &proto_client);
 			}
 
-			sc.PushRemoteClientsEvent();
+			sc.PushServerStatusEvent();
 		}
 		break;
 	}
@@ -881,7 +881,7 @@ void ClientImpl::ConnectedAt(RakNet::SystemAddress addr)
 	SendProtocolMessageID(ID_SERVER_INFO_REQUEST, addr);
 	SendProtocolMessageID(ID_SERVER_STATUS_REQUEST, addr);
 
-	PushConnectionsEvent(si.id, ConnectionEvent::NEW_CONNECTION);
+	PushConnectionsEvent(si.id, ConnectionEvent::TYPE_NEW_CONNECTION);
 }
 
 void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
@@ -896,7 +896,7 @@ void ClientImpl::DisconnectFrom(RakNet::SystemAddress addr)
 
 	sc.Clear();
 	si.id = Connection::UNASSIGNED_ID;
-	PushConnectionsEvent(id, ConnectionEvent::DISCONNECTION);
+	PushConnectionsEvent(id, ConnectionEvent::TYPE_DISCONNECTION);
 }
 
 void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Client* proto_client, TypeUpdateRemoteClient type)
@@ -922,12 +922,12 @@ void ClientImpl::UpdateRemoteClient(RakNet::SystemAddress addr, const Proto::Cli
 			if (self) sc.selfId = id;
 			ev->client = sc.clients[id];
 			ev->self = self;
-			ev->what = RemoteClientEvent::UPDATE_CLIENT;
+			ev->type = RemoteClientEvent::TYPE_CLIENT_UPDATED;
 			break;
 		case UPDATE_DISCONNECTION:
 			ev->client = sc.clients[id];
 			ev->self = (sc.selfId == id);
-			ev->what = RemoteClientEvent::DISCONNECTION;
+			ev->type = RemoteClientEvent::TYPE_CLIENT_DISCONNECTED;
 			sc.clients[id].id = RemoteClient::UNASSIGNED_ID;
 			sc.selfId = ev->self ? RemoteClient::UNASSIGNED_ID : sc.selfId;
 			break;
@@ -1033,7 +1033,7 @@ void ClientImpl::PushConnectionsEvent(Connection::id_t id, ConnectionEvent::Even
 	ConnectionImpl& sc = m_connections[id];
 	sc.data.ping = m_peer->GetAveragePing(sc.addr);
 	ev->connection = sc.data;
-	ev->what = type;
+	ev->type = type;
 
 	PushEvent(std::move(ev));
 }

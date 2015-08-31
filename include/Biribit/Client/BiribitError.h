@@ -2,7 +2,7 @@
 
 namespace Biribit
 {
-	enum ErrorType
+	enum ErrorId
 	{
 		ERROR_CODE = 0,
 		WARN_CLIENT_NAME_IN_USE,

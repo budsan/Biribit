@@ -5,31 +5,34 @@
 
 namespace Biribit
 {
-	enum EventType
+	enum EventId
 	{
-		TYPE_NONE = 0,
-		TYPE_ERROR,
-		TYPE_SERVER_LIST,
-		TYPE_CONNECTION,
-		TYPE_REMOTE_CLIENT,
-		TYPE_ROOM_LIST,
-		TYPE_JOINED_ROOM,
-		TYPE_BROADCAST,
-		TYPE_ENTRIES,
+		EVENT_NONE_ID = 0,
+		EVENT_ERROR_ID,
+		EVENT_SERVER_LIST_ID,
+		EVENT_CONNECTION_ID,
+		EVENT_SERVER_STATUS_ID,
+		EVENT_REMOTE_CLIENT_ID,
+		EVENT_ROOM_LIST_ID,
+		EVENT_JOINED_ROOM_ID,
+		EVENT_BROADCAST_ID,
+		EVENT_ENTRIES_ID,
 	};
 
 	struct API_EXPORT Event
 	{
-		EventType type;
+		EventId id;
 
 		Event();
-		Event(EventType);
+		Event(EventId);
 		virtual ~Event();
 	};
 
 	struct API_EXPORT ErrorEvent : public Event
 	{
-		ErrorType which;
+		enum { EVENT_ID = EVENT_ERROR_ID };
+
+		ErrorId which;
 
 		ErrorEvent();
 		virtual ~ErrorEvent();
@@ -37,7 +40,7 @@ namespace Biribit
 
 	struct API_EXPORT ServerListEvent : public Event
 	{
-		// ID_SERVER_INFO_RESPONSE
+		enum { EVENT_ID = EVENT_SERVER_LIST_ID };
 
 		ServerListEvent();
 		virtual ~ServerListEvent();
@@ -45,32 +48,42 @@ namespace Biribit
 
 	struct API_EXPORT ConnectionEvent : public Event
 	{
+		enum { EVENT_ID = EVENT_CONNECTION_ID };
 		enum EventType
 		{
-			NEW_CONNECTION,
-			DISCONNECTION,
-			UPDATED_SERVER_NAME
+			TYPE_NEW_CONNECTION,
+			TYPE_DISCONNECTION,
+			TYPE_NAME_UPDATED
 		};
 
-		EventType what;
+		EventType type;
 		Connection connection;
-
-		// ID_CLIENT_SELF_STATUS
-		// when DisconnectFrom is called
 
 		ConnectionEvent();
 		virtual ~ConnectionEvent();
 	};
 
+	struct API_EXPORT ServerStatusEvent : public Event
+	{
+		enum { EVENT_ID = EVENT_SERVER_STATUS_ID };
+
+		Connection::id_t connection;
+		std::vector<RemoteClient> clients;
+
+		ServerStatusEvent();
+		virtual ~ServerStatusEvent();
+	};
+
 	struct API_EXPORT RemoteClientEvent : public Event
 	{
+		enum { EVENT_ID = EVENT_REMOTE_CLIENT_ID };
 		enum EventType
 		{
-			UPDATE_CLIENT,
-			DISCONNECTION
+			TYPE_CLIENT_UPDATED,
+			TYPE_CLIENT_DISCONNECTED
 		};
 
-		EventType what;
+		EventType type;
 		Connection::id_t connection;
 		RemoteClient client;
 		bool self;
@@ -81,7 +94,7 @@ namespace Biribit
 
 	struct API_EXPORT RoomListEvent : public Event
 	{
-		// ID_ROOM_LIST_RESPONSE
+		enum { EVENT_ID = EVENT_ROOM_LIST_ID };
 
 		Connection::id_t connection;
 		std::vector<Room> rooms;
@@ -92,8 +105,7 @@ namespace Biribit
 
 	struct API_EXPORT JoinedRoomEvent : public Event
 	{
-		// ID_ROOM_STATUS
-		// ID_ROOM_JOIN_RESPONSE
+		enum { EVENT_ID = EVENT_JOINED_ROOM_ID };
 
 		Connection::id_t connection;
 		Room::id_t room_id;
@@ -105,6 +117,8 @@ namespace Biribit
 
 	struct API_EXPORT BroadcastEvent : public Event
 	{
+		enum { EVENT_ID = EVENT_BROADCAST_ID };
+
 		Connection::id_t connection;
 		milliseconds_t when;
 		Room::id_t room_id;
@@ -117,7 +131,7 @@ namespace Biribit
 
 	struct API_EXPORT EntriesEvent : public Event
 	{
-		// ID_JOURNAL_ENTRIES_STATUS
+		enum { EVENT_ID = EVENT_ENTRIES_ID };
 
 		Connection::id_t connection;
 		Room::id_t room_id;

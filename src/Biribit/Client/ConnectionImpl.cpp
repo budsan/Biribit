@@ -131,10 +131,11 @@ void ConnectionImpl::UpdateRooms(std::vector<Room>& vect)
 			vect.push_back(*it);
 }
 
-void ConnectionImpl::PushRemoteClientsEvent()
+void ConnectionImpl::PushServerStatusEvent()
 {
-	auto ev = std::unique_ptr<RemoteClientEvent>(new RemoteClientEvent());
+	auto ev = std::unique_ptr<ServerStatusEvent>(new ServerStatusEvent());
 	ev->connection = data.id;
+	UpdateRemoteClients(ev->clients);
 	parent->PushEvent(std::move(ev));
 }
 

@@ -55,7 +55,7 @@ public:
 
 	void UpdateRemoteClients(std::vector<RemoteClient>& vect);
 	void UpdateRooms(std::vector<Room>& vect);
-	void PushRemoteClientsEvent();
+	void PushServerStatusEvent();
 	void PushRoomListEvent();
 };
 

@@ -3,32 +3,35 @@
 namespace Biribit
 {
 
-Event::Event() : type(TYPE_NONE) {}
-Event::Event(EventType _type) : type(_type) {}
+Event::Event() : id(EVENT_NONE_ID) {}
+Event::Event(EventId _type) : id(_type) {}
 Event::~Event() {}
 
-ErrorEvent::ErrorEvent() : Event(TYPE_ERROR) {}
+ErrorEvent::ErrorEvent() : Event(EVENT_ERROR_ID) {}
 ErrorEvent::~ErrorEvent() {}
 
-ServerListEvent::ServerListEvent() : Event(TYPE_SERVER_LIST) {}
+ServerListEvent::ServerListEvent() : Event(EVENT_SERVER_LIST_ID) {}
 ServerListEvent::~ServerListEvent() {}
 
-ConnectionEvent::ConnectionEvent() : Event(TYPE_CONNECTION) {}
+ConnectionEvent::ConnectionEvent() : Event(EVENT_CONNECTION_ID) {}
 ConnectionEvent::~ConnectionEvent() {}
 
-RemoteClientEvent::RemoteClientEvent() : Event(TYPE_REMOTE_CLIENT) {}
+ServerStatusEvent::ServerStatusEvent() : Event(EVENT_SERVER_STATUS_ID) {}
+ServerStatusEvent::~ServerStatusEvent() {}
+
+RemoteClientEvent::RemoteClientEvent() : Event(EVENT_REMOTE_CLIENT_ID) {}
 RemoteClientEvent::~RemoteClientEvent() {}
 
-RoomListEvent::RoomListEvent() : Event(TYPE_ROOM_LIST) {}
+RoomListEvent::RoomListEvent() : Event(EVENT_ROOM_LIST_ID) {}
 RoomListEvent::~RoomListEvent() {}
 
-JoinedRoomEvent::JoinedRoomEvent() : Event(TYPE_JOINED_ROOM) {}
+JoinedRoomEvent::JoinedRoomEvent() : Event(EVENT_JOINED_ROOM_ID) {}
 JoinedRoomEvent::~JoinedRoomEvent() {}
 
-BroadcastEvent::BroadcastEvent() : Event(TYPE_BROADCAST) {}
+BroadcastEvent::BroadcastEvent() : Event(EVENT_BROADCAST_ID) {}
 BroadcastEvent::~BroadcastEvent() {}
 
-EntriesEvent::EntriesEvent() : Event(TYPE_ENTRIES) {}
+EntriesEvent::EntriesEvent() : Event(EVENT_ENTRIES_ID) {}
 EntriesEvent::~EntriesEvent() {}
 
 } //namespace Biribit
