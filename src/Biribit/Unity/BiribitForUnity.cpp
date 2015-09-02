@@ -4,6 +4,7 @@
 #include <Biribit/Common/Generic.h>
 #include <Biribit/Client.h>
 
+#include <list>
 #include <algorithm>
 #include <memory>
 #include <cstdarg>
@@ -13,23 +14,12 @@ struct brbt_array
 {
 	unsigned char* arr;
 	unsigned int size;
-	unsigned int revision;
 	Generic::TempBuffer buffer;
 
 	brbt_array()
 		: arr(NULL)
 		, size(0)
-		, revision(0)
 	{}
-
-	bool revision_check(unsigned int new_revision)
-	{
-		if (revision == new_revision)
-			return false;
-
-		revision = new_revision;
-		return true;
-	}
 
 	template <class T> T* resize(std::size_t count)
 	{
@@ -64,10 +54,60 @@ struct brbt_context
 	brbt_array GetRooms_array;
 	std::vector<std::vector<unsigned int>> GetRooms_alloc;
 
-	std::unique_ptr<Biribit::Received> recv;
-	brbt_Received m_recv;
 	brbt_Entry m_entry;
+
+	std::list<std::function<bool()>> tasks;
 };
+
+//-allocs--------------------------------------------------------------------//
+
+brbt_RemoteClient_array alloc_RemoteClient_array(brbt_context* context, const std::vector<Biribit::RemoteClient>& client_result)
+{
+	brbt_array& temp_array = context->GetRemoteClients_array;
+	std::vector<std::string>& temp_alloc = context->GetRemoteClients_alloc;
+
+	temp_alloc.clear();
+	brbt_RemoteClient* arr = temp_array.resize<brbt_RemoteClient>(client_result.size());
+
+	// Alloc everything first. Pointers may change if vector reallocates.
+	for (std::size_t i = 0; i < client_result.size(); i++) {
+		temp_alloc.push_back(client_result[i].name);
+		temp_alloc.push_back(client_result[i].appid);
+	}
+
+	std::size_t push_i = 0;
+	for (std::size_t i = 0; i < client_result.size(); i++)
+	{
+		arr[i].id = client_result[i].id;
+		arr[i].name = temp_alloc[push_i++].c_str();
+		arr[i].appid = temp_alloc[push_i++].c_str();
+	}
+
+	return temp_array.convert<brbt_RemoteClient_array>();
+}
+
+brbt_Room_array alloc_Room_array(brbt_context* context, const std::vector<Biribit::Room>& client_result)
+{
+	brbt_array& temp_array = context->GetRooms_array;
+	std::vector<std::vector<unsigned int>>& temp_alloc = context->GetRooms_alloc;
+
+	temp_alloc.clear();
+	brbt_Room* arr = temp_array.resize<brbt_Room>(client_result.size());
+
+	// Alloc everything first. Pointers may change if vector reallocates.
+	for (std::size_t i = 0; i < client_result.size(); i++)
+		temp_alloc.push_back(client_result[i].slots);
+
+	for (std::size_t i = 0; i < client_result.size(); i++) {
+		arr[i].id = client_result[i].id;
+		arr[i].slots_size = temp_alloc[i].size();
+		arr[i].slots = &(temp_alloc[i].at(0));
+	}
+
+	return temp_array.convert<brbt_Room_array>();
+}
+
+//---------------------------------------------------------------------------//
 
 // Useful in Unity for changing between scenes and keeping same instance.
 brbt_Client single_instance = NULL;
@@ -133,102 +173,120 @@ void brbt_RefreshServerList(brbt_Client client)
 	cl->RefreshServerList();
 }
 
-const brbt_ServerInfo_array brbt_GetServerList(brbt_Client client, unsigned int* revision)
+template<class T> bool Future_Then(std::shared_future<T> src, std::function<void()> then)
 {
-	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
-	brbt_array& temp_array = context->GetServerList_array;
-	std::vector<std::string>& temp_alloc = context->GetServerList_alloc;
+	if (!src.valid())
+		return true;
 
-	unsigned int rev;
-	auto client_result = cl->GetServerList(&rev);
-	if (temp_array.revision_check(rev))
-	{
-		temp_alloc.clear();
-		brbt_ServerInfo* arr = temp_array.resize<brbt_ServerInfo>(client_result.size());
-
-		// Alloc everything first. Pointers may change if vector reallocates.
-		for (std::size_t i = 0; i < client_result.size(); i++) {
-			std::size_t name_i = temp_alloc.size(); temp_alloc.push_back(client_result[i].name);
-			std::size_t addr_i = temp_alloc.size(); temp_alloc.push_back(client_result[i].addr);
-		}
-
-		std::size_t push_i = 0;
-		for (std::size_t i = 0; i < client_result.size(); i++)
-		{
-			arr[i].name = temp_alloc[push_i++].c_str();
-			arr[i].addr = temp_alloc[push_i++].c_str();
-			arr[i].ping = client_result[i].ping;
-			arr[i].port = client_result[i].port;
-			arr[i].passwordProtected = client_result[i].passwordProtected;
-		}
+	if (src.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+		then();
+		return true;
 	}
 
-	if (revision != nullptr)
-		*revision = rev;
-	return temp_array.convert<brbt_ServerInfo_array>();
+	return false;
 }
 
-const brbt_Connection_array brbt_GetConnections(brbt_Client client, unsigned int* revision)
+void brbt_GetServerList(brbt_Client client, brbt_ServerInfo_callback callback)
 {
-	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
-	brbt_array& temp_array = context->GetConnections_array;
-	std::vector<std::string>& temp_alloc = context->GetConnections_alloc;
-
-	unsigned int rev;
-	auto client_result = cl->GetConnections(&rev);
-	if (temp_array.revision_check(rev))
+	brbt_context* context = (brbt_context*)client; Biribit::Client* cl = &(context->client);
+	auto future = context->client.GetServerList().share();
+	context->tasks.push_back([context, future, callback]() -> bool
 	{
-		temp_alloc.clear();
-		brbt_Connection* arr = temp_array.resize<brbt_Connection>(client_result.size());
-
-		// Alloc everything first. Pointers may change if vector reallocates.
-		for (std::size_t i = 0; i < client_result.size(); i++)
-			temp_alloc.push_back(client_result[i].name);
-
-		for (std::size_t i = 0; i < client_result.size(); i++)
+		return Future_Then(future, [context, future, callback]
 		{
-			arr[i].id = client_result[i].id;
-			arr[i].name = temp_alloc[i].c_str();
-			arr[i].ping = client_result[i].ping;
-		}
-	}
+			brbt_array& temp_array = context->GetServerList_array;
+			std::vector<std::string>& temp_alloc = context->GetServerList_alloc;
+			const std::vector<Biribit::ServerInfo>& client_result = future.get();
 
-	if (revision != nullptr)
-		*revision = rev;
-	return temp_array.convert<brbt_Connection_array>();
+			temp_alloc.clear();
+			brbt_ServerInfo* arr = temp_array.resize<brbt_ServerInfo>(client_result.size());
+
+			// Alloc everything first. Pointers may change if vector reallocates.
+			for (std::size_t i = 0; i < client_result.size(); i++) {
+				std::size_t name_i = temp_alloc.size(); temp_alloc.push_back(client_result[i].name);
+				std::size_t addr_i = temp_alloc.size(); temp_alloc.push_back(client_result[i].addr);
+			}
+
+			std::size_t push_i = 0;
+			for (std::size_t i = 0; i < client_result.size(); i++)
+			{
+				arr[i].name = temp_alloc[push_i++].c_str();
+				arr[i].addr = temp_alloc[push_i++].c_str();
+				arr[i].ping = client_result[i].ping;
+				arr[i].port = client_result[i].port;
+				arr[i].passwordProtected = client_result[i].passwordProtected;
+			}
+
+			callback(temp_array.convert<brbt_ServerInfo_array>());
+		});
+	});
 }
 
-const brbt_RemoteClient_array brbt_GetRemoteClients(brbt_Client client, brbt_id_t id_conn, unsigned int* revision)
+void brbt_GetConnections(brbt_Client client, brbt_Connection_callback callback)
 {
-	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
-	brbt_array& temp_array = context->GetRemoteClients_array;
-	std::vector<std::string>& temp_alloc = context->GetRemoteClients_alloc;
-
-	unsigned int rev;
-	auto client_result = cl->GetRemoteClients(id_conn, &rev);
-	if (temp_array.revision_check(rev))
+	brbt_context* context = (brbt_context*)client; Biribit::Client* cl = &(context->client);
+	auto future = context->client.GetConnections().share();
+	context->tasks.push_back([context, future, callback]() -> bool
 	{
-		temp_alloc.clear();
-		brbt_RemoteClient* arr = temp_array.resize<brbt_RemoteClient>(client_result.size());
-
-		// Alloc everything first. Pointers may change if vector reallocates.
-		for (std::size_t i = 0; i < client_result.size(); i++) {
-			temp_alloc.push_back(client_result[i].name);
-			temp_alloc.push_back(client_result[i].appid);
-		}
-
-		std::size_t push_i = 0;
-		for (std::size_t i = 0; i < client_result.size(); i++)
+		return Future_Then(future, [context, future, callback]
 		{
-			arr[i].id = client_result[i].id;
-			arr[i].name = temp_alloc[push_i++].c_str();
-			arr[i].appid = temp_alloc[push_i++].c_str();
-		}
-	}
+			brbt_array& temp_array = context->GetConnections_array;
+			std::vector<std::string>& temp_alloc = context->GetConnections_alloc;
+			const std::vector<Biribit::Connection>& client_result = future.get();
 
-	if (revision != nullptr)
-		*revision = rev;
-	return temp_array.convert<brbt_RemoteClient_array>();
+			temp_alloc.clear();
+			brbt_Connection* arr = temp_array.resize<brbt_Connection>(client_result.size());
+
+			// Alloc everything first. Pointers may change if vector reallocates.
+			for (std::size_t i = 0; i < client_result.size(); i++)
+				temp_alloc.push_back(client_result[i].name);
+
+			for (std::size_t i = 0; i < client_result.size(); i++)
+			{
+				arr[i].id = client_result[i].id;
+				arr[i].name = temp_alloc[i].c_str();
+				arr[i].ping = client_result[i].ping;
+			}
+
+			callback(temp_array.convert<brbt_Connection_array>());
+		});
+	});
+}
+
+void brbt_GetRemoteClients(brbt_Client client, brbt_id_t id_conn, brbt_RemoteClient_callback callback)
+{
+	brbt_context* context = (brbt_context*)client; Biribit::Client* cl = &(context->client);
+	auto future = context->client.GetRemoteClients(id_conn).share();
+	context->tasks.push_back([context, future, callback]() -> bool
+	{
+		return Future_Then(future, [context, future, callback]
+		{
+			callback(alloc_RemoteClient_array(context, future.get()));
+		});
+	});
+}
+
+void brbt_GetRooms(brbt_Client client, brbt_id_t id_conn, brbt_Room_callback callback)
+{
+	brbt_context* context = (brbt_context*)client; Biribit::Client* cl = &(context->client);
+	auto future = cl->GetRooms(id_conn).share();
+	context->tasks.push_back([context, future, callback]() -> bool
+	{
+		return Future_Then(future, [context, future, callback]
+		{
+			callback(alloc_Room_array(context, future.get()));
+		});
+	});
+}
+
+void brbt_UpdateCallbacks(brbt_Client client)
+{
+	brbt_context* context = (brbt_context*)client; Biribit::Client* cl = &(context->client);
+	for (auto it = context->tasks.begin(); it != context->tasks.end();)
+		if ((*it)())
+			it = context->tasks.erase(it);
+		else
+			it++;
 }
 
 brbt_id_t brbt_GetLocalClientId(brbt_Client client, brbt_id_t id_conn)
@@ -252,48 +310,19 @@ void brbt_RefreshRooms(brbt_Client client, brbt_id_t id_conn)
 	cl->RefreshRooms(id_conn);
 }
 
-const brbt_Room_array brbt_GetRooms(brbt_Client client, brbt_id_t id_conn, unsigned int* revision)
-{
-	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
-	brbt_array& temp_array = context->GetRooms_array;
-	std::vector<std::vector<unsigned int>>& temp_alloc = context->GetRooms_alloc;
-
-	unsigned int rev;
-	auto client_result = cl->GetRooms(id_conn, &rev);
-	if (temp_array.revision_check(rev))
-	{
-		temp_alloc.clear();
-		brbt_Room* arr = temp_array.resize<brbt_Room>(client_result.size());
-
-		// Alloc everything first. Pointers may change if vector reallocates.
-		for (std::size_t i = 0; i < client_result.size(); i++)
-			temp_alloc.push_back(client_result[i].slots);
-
-		for (std::size_t i = 0; i < client_result.size(); i++) {
-			arr[i].id = client_result[i].id;
-			arr[i].slots_size = temp_alloc[i].size();
-			arr[i].slots = &(temp_alloc[i].at(0));
-		}
-	}
-
-	if (revision != nullptr)
-		*revision = rev;
-	return temp_array.convert<brbt_Room_array>();
-}
-
-void brbt_CreateRoom(brbt_Client client, brbt_id_t id_conn, unsigned int num_slots)
+void brbt_CreateRoom(brbt_Client client, brbt_id_t id_conn, brbt_slot_id_t num_slots)
 {
 	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->CreateRoom(id_conn, num_slots);
 }
 
-void brbt_CreateRoomAndJoinSlot(brbt_Client client, brbt_id_t id_conn, unsigned int num_slots, unsigned int slot_to_join_id)
+void brbt_CreateRoomAndJoinSlot(brbt_Client client, brbt_id_t id_conn, brbt_slot_id_t num_slots, brbt_slot_id_t slot_to_join_id)
 {
 	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->CreateRoom(id_conn, num_slots, slot_to_join_id);
 }
 
-void brbt_JoinRandomOrCreateRoom(brbt_Client client, brbt_id_t id_conn, unsigned int num_slots)
+void brbt_JoinRandomOrCreateRoom(brbt_Client client, brbt_id_t id_conn, brbt_slot_id_t num_slots)
 {
 	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->JoinRandomOrCreateRoom(id_conn, num_slots);
@@ -305,7 +334,7 @@ void brbt_JoinRoom(brbt_Client client, brbt_id_t id_conn, brbt_id_t room_id)
 	cl->JoinRoom(id_conn, room_id);
 }
 
-void brbt_JoinRoomAndSlot(brbt_Client client, brbt_id_t id_conn, brbt_id_t room_id, unsigned int slot_id)
+void brbt_JoinRoomAndSlot(brbt_Client client, brbt_id_t id_conn, brbt_id_t room_id, brbt_slot_id_t slot_id)
 {
 	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
 	cl->JoinRoom(id_conn, room_id, slot_id);
@@ -335,31 +364,136 @@ void brbt_SendEntry(brbt_Client client, brbt_id_t id_con, const void* data, unsi
 	cl->SendEntry(id_con, (const char*)data, size);
 }
 
-unsigned int brbt_GetDataSizeOfNextReceived(brbt_Client client)
+template<class T, class U> std::unique_ptr<T> unique_ptr_cast(std::unique_ptr<U>& ptr)
 {
-	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
-	return cl->GetDataSizeOfNextReceived();
+	return std::unique_ptr<T>(static_cast<T*>(ptr.release()));
 }
 
-const brbt_Received* brbt_PullReceived(brbt_Client client)
+void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, std::unique_ptr<Biribit::ErrorEvent> evnt)
 {
-	brbt_context* context = (brbt_context*) client; Biribit::Client* cl = &(context->client);
+	brbt_ErrorEvent ret;
+	ret.which = (brbt_ErrorId) evnt->which;
+	table->error(&ret);
+}
 
-	context->recv = cl->PullReceived();
-	if (context->recv != nullptr)
+void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, std::unique_ptr<Biribit::ServerListEvent> evnt)
+{
+	brbt_ServerListEvent ret;
+	table->server_list(&ret);
+}
+
+void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, std::unique_ptr<Biribit::ConnectionEvent> evnt)
+{
+	brbt_ConnectionEvent ret;
+	ret.type = (brbt_ConnectionEventType) evnt->type;
+	ret.connection.id = evnt->connection.id;
+	ret.connection.name = evnt->connection.name.c_str();
+	ret.connection.ping = evnt->connection.ping;
+
+	table->connection(&ret);
+}
+
+void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, std::unique_ptr<Biribit::ServerStatusEvent> evnt)
+{
+	brbt_ServerStatusEvent ret;
+	ret.connection = evnt->connection;
+	ret.clients = alloc_RemoteClient_array((brbt_context*)client, evnt->clients);
+
+	table->server_status(&ret);
+}
+
+void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, std::unique_ptr<Biribit::RemoteClientEvent> evnt)
+{
+	brbt_RemoteClientEvent ret;
+	ret.type = (brbt_RemoteClientEventType) evnt->type;
+	ret.client.id = evnt->client.id;
+	ret.client.name = evnt->client.name.c_str();
+	ret.client.appid = evnt->client.name.c_str();
+	ret.self = evnt->self ? BRBT_TRUE : BRBT_FALSE;
+
+	table->remote_client(&ret);
+}
+
+void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, std::unique_ptr<Biribit::RoomListEvent> evnt)
+{
+	brbt_RoomListEvent ret;
+	ret.connection = evnt->connection;
+	ret.rooms = alloc_Room_array((brbt_context*)client, evnt->rooms);
+	
+	table->room_list(&ret);
+}
+
+void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, std::unique_ptr<Biribit::JoinedRoomEvent> evnt)
+{
+	brbt_JoinedRoomEvent ret;
+	ret.connection = evnt->connection;
+	ret.room_id = evnt->room_id;
+	ret.slot_id = evnt->slot_id;
+
+	table->joined_room(&ret);
+}
+
+void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, std::unique_ptr<Biribit::BroadcastEvent> evnt)
+{
+	brbt_BroadcastEvent ret;
+	ret.connection = evnt->connection;
+	ret.when = evnt->when;
+	ret.room_id = evnt->room_id;
+	ret.slot_id = evnt->slot_id;
+	ret.data_size = evnt->data.getDataSize();
+	ret.data = evnt->data.getData();
+
+	table->broadcast(&ret);
+}
+
+void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, std::unique_ptr<Biribit::EntriesEvent> evnt)
+{
+	brbt_EntriesEvent res;
+	res.connection = evnt->connection;
+	res.room_id = evnt->room_id;
+	
+	table->entries(&res);
+}
+
+void brbt_PullEvent(brbt_Client client, const brbt_EventCallbackTable* table)
+{
+	std::unique_ptr<Biribit::Event> evnt;
+	brbt_context* context = (brbt_context*)client; Biribit::Client* cl = &(context->client);
+	while ((evnt = cl->PullEvent()) != nullptr)
 	{
-		context->m_recv.when = context->recv->when;
-		context->m_recv.connection = context->recv->connection;
-		context->m_recv.room_id = context->recv->room_id;
-		context->m_recv.slot_id = context->recv->slot_id;
-		context->m_recv.data_size = context->recv->data.getDataSize();
-		context->m_recv.data = context->recv->data.getData();
-		return &(context->m_recv);
+		switch (evnt->id)
+		{
+		case Biribit::EVENT_NONE_ID:
+			break;
+		case Biribit::ErrorEvent::EVENT_ID:
+			brbt_HandleEvent(client, table, unique_ptr_cast<Biribit::ErrorEvent>(evnt));
+			break;
+		case Biribit::ServerListEvent::EVENT_ID:
+			brbt_HandleEvent(client, table, unique_ptr_cast<Biribit::ServerListEvent>(evnt));
+			break;
+		case Biribit::ConnectionEvent::EVENT_ID:
+			brbt_HandleEvent(client, table, unique_ptr_cast<Biribit::ConnectionEvent>(evnt));
+			break;
+		case Biribit::ServerStatusEvent::EVENT_ID:
+			brbt_HandleEvent(client, table, unique_ptr_cast<Biribit::ServerStatusEvent>(evnt));
+			break;
+		case Biribit::RemoteClientEvent::EVENT_ID:
+			brbt_HandleEvent(client, table, unique_ptr_cast<Biribit::RemoteClientEvent>(evnt));
+			break;
+		case Biribit::RoomListEvent::EVENT_ID:
+			brbt_HandleEvent(client, table, unique_ptr_cast<Biribit::RoomListEvent>(evnt));
+			break;
+		case Biribit::JoinedRoomEvent::EVENT_ID:
+			brbt_HandleEvent(client, table, unique_ptr_cast<Biribit::JoinedRoomEvent>(evnt));
+			break;
+		case Biribit::BroadcastEvent::EVENT_ID:
+			brbt_HandleEvent(client, table, unique_ptr_cast<Biribit::BroadcastEvent>(evnt));
+			break;
+		case Biribit::EntriesEvent::EVENT_ID:
+			brbt_HandleEvent(client, table, unique_ptr_cast<Biribit::EntriesEvent>(evnt));
+			break;
+		}
 	}
-	else
-	{
-		return nullptr;
-	}	
 }
 
 brbt_id_t brbt_GetEntriesCount(brbt_Client client, brbt_id_t id_con)

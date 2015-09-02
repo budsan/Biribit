@@ -34,13 +34,6 @@ public:
 	future_vector<RemoteClient> GetRemoteClients(Connection::id_t id);
 	future_vector<Room> GetRooms(Connection::id_t id);
 
-	/*
-	const std::vector<ServerInfo>& GetServerList(std::uint32_t* revision = nullptr);
-	const std::vector<Connection>& GetConnections(std::uint32_t* revision = nullptr);
-	const std::vector<RemoteClient>& GetRemoteClients(Connection::id_t id, std::uint32_t* revision = nullptr);
-	const std::vector<Room>& GetRooms(Connection::id_t id, std::uint32_t* revision = nullptr);
-	*/
-
 	RemoteClient::id_t GetLocalClientId(Connection::id_t id);
 	void SetLocalClientParameters(Connection::id_t id, const ClientParameters& parameters);
 
