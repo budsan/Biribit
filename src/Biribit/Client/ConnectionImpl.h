@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+#include <atomic>
 
 #include <Biribit/Packet.h>
 #include <Biribit/Common/PrintLog.h>
@@ -35,8 +36,8 @@ public:
 	std::vector<RemoteClient> clients;
 	std::vector<Room> rooms;
 
-	Room::id_t joinedRoom;
-	Room::slot_id_t joinedSlot;
+	std::atomic<Room::id_t> joinedRoom;
+	std::atomic<Room::slot_id_t> joinedSlot;
 
 	//TODO: I would like to change this.
 	std::vector<RefSwap<Entry>> joinedRoomEntries;

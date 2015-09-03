@@ -52,7 +52,7 @@ struct brbt_context
 	std::vector<std::string> GetRemoteClients_alloc;
 
 	brbt_array GetRooms_array;
-	std::vector<std::vector<unsigned int>> GetRooms_alloc;
+	std::vector<std::vector<brbt_id_t>> GetRooms_alloc;
 
 	brbt_Entry m_entry;
 
@@ -89,7 +89,7 @@ brbt_RemoteClient_array alloc_RemoteClient_array(brbt_context* context, const st
 brbt_Room_array alloc_Room_array(brbt_context* context, const std::vector<Biribit::Room>& client_result)
 {
 	brbt_array& temp_array = context->GetRooms_array;
-	std::vector<std::vector<unsigned int>>& temp_alloc = context->GetRooms_alloc;
+	std::vector<std::vector<brbt_id_t>>& temp_alloc = context->GetRooms_alloc;
 
 	temp_alloc.clear();
 	brbt_Room* arr = temp_array.resize<brbt_Room>(client_result.size());
@@ -406,9 +406,15 @@ void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, 
 {
 	brbt_RemoteClientEvent ret;
 	ret.type = (brbt_RemoteClientEventType) evnt->type;
+	
+	std::vector<std::string>& temp_alloc = ((brbt_context*)client)->GetRemoteClients_alloc;
+	temp_alloc.clear();
+	temp_alloc.push_back(evnt->client.name);
+	temp_alloc.push_back(evnt->client.appid);
+
 	ret.client.id = evnt->client.id;
-	ret.client.name = evnt->client.name.c_str();
-	ret.client.appid = evnt->client.name.c_str();
+	ret.client.name = temp_alloc[0].c_str();
+	ret.client.appid = temp_alloc[1].c_str();
 	ret.self = evnt->self ? BRBT_TRUE : BRBT_FALSE;
 
 	table->remote_client(&ret);
@@ -455,7 +461,7 @@ void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, 
 	table->entries(&res);
 }
 
-void brbt_PullEvent(brbt_Client client, const brbt_EventCallbackTable* table)
+void brbt_PullEvents(brbt_Client client, const brbt_EventCallbackTable* table)
 {
 	std::unique_ptr<Biribit::Event> evnt;
 	brbt_context* context = (brbt_context*)client; Biribit::Client* cl = &(context->client);

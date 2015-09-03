@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <utility>
 #include <mutex>
 #include <memory>
@@ -7,16 +8,12 @@
 template<class T> class RefSwap
 {
 	std::unique_ptr<T> ptr[2];
-	std::size_t sel;
-
-	std::mutex mutex;
-	unsigned int revision;
+	std::atomic<std::size_t> sel;
 
 public:
 
 	RefSwap()
 		: sel(0)
-		, revision(0)
 	{
 		ptr[0] = std::unique_ptr<T>(new T());
 		ptr[1] = std::unique_ptr<T>(new T());
@@ -26,18 +23,15 @@ public:
 	{
 		std::swap(ptr[0], other.ptr[0]);
 		std::swap(ptr[1], other.ptr[1]);
-		std::swap(sel, other.sel);
-		std::swap(revision, other.revision);
+		sel = other.sel.load();
 	}
 
 	RefSwap(const RefSwap& other) : RefSwap()
 	{
 	}
 
-
 	template<class... Args> RefSwap(Args&&... args)
 		: sel(0)
-		, revision(0)
 	{
 		ptr[0] = std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 		ptr[1] = std::unique_ptr<T>(new T(std::forward<Args>(args)...));
@@ -52,10 +46,9 @@ public:
 		return *this;
 	}
 
-	const T& front(unsigned int* _revision) {
-		std::lock_guard<std::mutex> lock(mutex);
+	const T& front(std::size_t* _revision) {
 		if (_revision != nullptr)
-			*_revision = revision;
+			*_revision = sel;
 		
 		return *ptr[sel&1];
 	}
@@ -65,12 +58,10 @@ public:
 	}
 
 	bool hasEverSwapped() {
-		return revision > 0;
+		return sel > 0;
 	}
 
 	void swap() {
-		std::lock_guard<std::mutex> lock(mutex);
-		revision++;
-		sel = ~sel;
+		sel++;
 	}
 };

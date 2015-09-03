@@ -250,6 +250,7 @@ private:
 			{
 				auto ss_evnt = unique_ptr_cast<Biribit::RemoteClientEvent>(evnt);
 				//TODO: Implement client side without getters.
+				break;
 			}
 			case Biribit::RemoteClientEvent::EVENT_ID:
 			{
