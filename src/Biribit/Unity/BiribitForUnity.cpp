@@ -412,6 +412,7 @@ void brbt_HandleEvent(brbt_Client client, const brbt_EventCallbackTable* table, 
 	temp_alloc.push_back(evnt->client.name);
 	temp_alloc.push_back(evnt->client.appid);
 
+	ret.connection = evnt->connection;
 	ret.client.id = evnt->client.id;
 	ret.client.name = temp_alloc[0].c_str();
 	ret.client.appid = temp_alloc[1].c_str();
