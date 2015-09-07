@@ -14,7 +14,7 @@
 
 template<int N> int sizeof_array(const char (&s)[N]) { return N; }
 
-char* BiribitErrorStrings[] = {
+const char* BiribitErrorStrings[] = {
 	"NO_ERROR",
 	"WARN_CLIENT_NAME_IN_USE",
 	"WARN_CANNOT_LIST_ROOMS_WITHOUT_APPID",
@@ -124,7 +124,7 @@ private:
 
 	template<class T> void PushFuture(T* dst, std::shared_future<T> src, std::function<void()> then)
 	{
-		tasks.push_back([this, dst, src]() -> bool { return HandleFuture<T>(dst, src, then); });
+		tasks.push_back([this, dst, src, then]() -> bool { return HandleFuture<T>(dst, src, then); });
 	}
 
 	template<class T> bool HandleFuture(T* dst, std::shared_future<T> src, std::function<void()> then)

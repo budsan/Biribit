@@ -17,6 +17,7 @@ elseif (SYS_OS_ANDROID)
 else()
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/protobuf/)
     set(PROTOBUF_PLATFORM_SRC_FILES)
+    add_definitions(-DHAVE_CONFIG_H -DHAVE_PTHREAD=1 -DHAVE_ZLIB=1 -DNDEBUG)
 endif()
 set(PROTOBUF_COMMON_SRC_FILES
   protobuf/src/google/protobuf/stubs/atomicops_internals_x86_gcc.cc 
@@ -24,7 +25,9 @@ set(PROTOBUF_COMMON_SRC_FILES
   protobuf/src/google/protobuf/stubs/bytestream.cc
   protobuf/src/google/protobuf/stubs/bytestream.h 
   protobuf/src/google/protobuf/stubs/common.cc
-  protobuf/src/google/protobuf/stubs/hash.h   
+  protobuf/src/google/protobuf/stubs/hash.h
+  protobuf/src/google/protobuf/stubs/int128.cc
+  protobuf/src/google/protobuf/stubs/int128.h
   protobuf/src/google/protobuf/stubs/map_util.h   
   protobuf/src/google/protobuf/stubs/mathutil.h   
   protobuf/src/google/protobuf/stubs/once.cc  
@@ -38,6 +41,7 @@ set(PROTOBUF_COMMON_SRC_FILES
   protobuf/src/google/protobuf/stubs/stringpiece.h
   protobuf/src/google/protobuf/stubs/stringprintf.cc
   protobuf/src/google/protobuf/stubs/stringprintf.h 
+  protobuf/src/google/protobuf/stubs/structurally_valid.cc
   protobuf/src/google/protobuf/stubs/strutil.cc   
   protobuf/src/google/protobuf/stubs/strutil.h
   protobuf/src/google/protobuf/stubs/time.cc  
@@ -54,6 +58,7 @@ set(PROTOBUF_COMMON_SRC_FILES
   protobuf/src/google/protobuf/io/zero_copy_stream.cc   
   protobuf/src/google/protobuf/io/zero_copy_stream_impl_lite.cc
 )
+
 
 set(PROTOBUF_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/src)
 include_directories(${PROTOBUF_INCLUDE_DIR})

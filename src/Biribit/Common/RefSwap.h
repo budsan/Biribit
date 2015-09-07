@@ -30,13 +30,6 @@ public:
 	{
 	}
 
-	template<class... Args> RefSwap(Args&&... args)
-		: sel(0)
-	{
-		ptr[0] = std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-		ptr[1] = std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-	}
-
 	~RefSwap()
 	{
 	}
